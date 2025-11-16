@@ -1,28 +1,48 @@
 // 安全工具函数
 class SecurityUtils {
-    // XSS防护 - HTML内容清理
-    static sanitizeHTML(str) {
+    // XSS防护 - 严格的输入清理
+    static sanitizeInput(str) {
         if (typeof str !== 'string') return '';
         
-        const div = document.createElement('div');
-        div.textContent = str;
-        return div.innerHTML;
+        // 移除所有HTML标签和特殊字符
+        return str.replace(/<[^>]*>/g, '')
+                 .replace(/[<>"'&]/g, '')
+                 .trim();
     }
     
     // XSS防护 - 安全的DOM操作
     static safeSetHTML(element, content) {
         if (!element) return;
         
-        // 清理所有HTML标签，只保留文本
-        element.textContent = content;
+        // 严格验证内容类型
+        if (typeof content !== 'string' && typeof content !== 'number') {
+            console.warn('Invalid content type for DOM operation');
+            return;
+        }
+        
+        // 只使用textContent，永不使用innerHTML
+        element.textContent = String(content);
     }
     
     // XSS防护 - 安全的属性设置
     static safeSetAttribute(element, attr, value) {
         if (!element || !attr) return;
         
-        // 清理属性值
-        const cleanValue = String(value).replace(/[<>"'&]/g, '');
+        // 白名单验证属性名
+        const allowedAttrs = ['id', 'class', 'data-*', 'aria-*'];
+        if (!allowedAttrs.some(allowed => 
+            allowed.endsWith('*') ? attr.startsWith(allowed.slice(0, -1)) : attr === allowed
+        )) {
+            console.warn('Attribute not in whitelist:', attr);
+            return;
+        }
+        
+        // 严格清理属性值
+        const cleanValue = String(value)
+            .replace(/[<>"'&\n\r\t]/g, '')
+            .replace(/javascript:/gi, '')
+            .replace(/on\w+=/gi, '');
+        
         element.setAttribute(attr, cleanValue);
     }
     

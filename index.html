@@ -373,16 +373,27 @@
         // 渲染日期卡片
         function renderDateCards() {
             const dates = generateDates();
-            const html = dates.map(dateInfo => `
-                <div class="date-card ${dateInfo.date === currentDate ? 'active' : ''}" 
-                     onclick="selectDate('${dateInfo.date}')">
-                    <div class="day">${dateInfo.day}</div>
-                    <div class="date">${dateInfo.dateStr}</div>
-                </div>
-            `).join('');
             const dateCardsElement = document.getElementById('date-cards');
             dateCardsElement.innerHTML = ''; // 清空
-            dateCardsElement.insertAdjacentHTML('beforeend', html); // 安全插入
+            
+            // 安全的DOM操作 - 不使用innerHTML
+            dates.forEach(dateInfo => {
+                const cardDiv = document.createElement('div');
+                cardDiv.className = `date-card ${dateInfo.date === currentDate ? 'active' : ''}`;
+                cardDiv.onclick = () => selectDate(dateInfo.date);
+                
+                const dayDiv = document.createElement('div');
+                dayDiv.className = 'day';
+                SecurityUtils.safeSetHTML(dayDiv, dateInfo.day);
+                
+                const dateDiv = document.createElement('div');
+                dateDiv.className = 'date';
+                SecurityUtils.safeSetHTML(dateDiv, dateInfo.dateStr);
+                
+                cardDiv.appendChild(dayDiv);
+                cardDiv.appendChild(dateDiv);
+                dateCardsElement.appendChild(cardDiv);
+            });
         }
 
         // 选择日期
@@ -413,44 +424,77 @@
                 .sort((a, b) => b.shortboard.score - a.shortboard.score)
                 .slice(0, 3);
 
-            // 渲染长板推荐
-            const longboardHtml = topLongboard.map(item => `
-                <div class="spot-card">
-                    <div class="spot-name">${item.spot.name}</div>
-                    <div class="spot-info">
-                        <span class="spot-score score-${item.longboard.rating}">评分: ${item.longboard.score}</span>
-                        <span class="wave-info">总浪: ${item.waveData.totalWaveHeight || item.waveData.waveHeight}m</span>
-                    </div>
-                    <div class="wave-info" style="font-size: 0.85em; color: #666; margin: 5px 0;">
-                        风浪: ${item.waveData.windWaveHeight || (item.waveData.waveHeight * 0.5).toFixed(2)}m | 
-                        涌浪: ${item.waveData.swellHeight || (item.waveData.waveHeight * 0.4).toFixed(2)}m
-                    </div>
-                    <div class="recommendation">${getLongboardRecommendation(item.longboard.score)}</div>
-                </div>
-            `).join('');
-            
-            // 渲染短板推荐
-            const shortboardHtml = topShortboard.map(item => `
-                <div class="spot-card">
-                    <div class="spot-name">${item.spot.name}</div>
-                    <div class="spot-info">
-                        <span class="spot-score score-${item.shortboard.rating}">评分: ${item.shortboard.score}</span>
-                        <span class="wave-info">总浪: ${item.waveData.totalWaveHeight || item.waveData.waveHeight}m</span>
-                    </div>
-                    <div class="wave-info" style="font-size: 0.85em; color: #666; margin: 5px 0;">
-                        风浪: ${item.waveData.windWaveHeight || (item.waveData.waveHeight * 0.5).toFixed(2)}m | 
-                        涌浪: ${item.waveData.swellHeight || (item.waveData.waveHeight * 0.4).toFixed(2)}m
-                    </div>
-                    <div class="recommendation">${getShortboardRecommendation(item.shortboard.score)}</div>
-                </div>
-            `).join('');
-            
+            // 安全渲染长板推荐
             const longboardElement = document.getElementById('longboard-recommendations');
-            longboardElement.innerHTML = ''; // 清空
-            longboardElement.insertAdjacentHTML('beforeend', longboardHtml);
+            longboardElement.innerHTML = '';
+            
+            topLongboard.forEach(item => {
+                const cardDiv = document.createElement('div');
+                cardDiv.className = 'spot-card';
+                
+                const nameDiv = document.createElement('div');
+                nameDiv.className = 'spot-name';
+                SecurityUtils.safeSetHTML(nameDiv, item.spot.name);
+                
+                const infoDiv = document.createElement('div');
+                infoDiv.className = 'spot-info';
+                
+                const scoreSpan = document.createElement('span');
+                scoreSpan.className = `spot-score score-${item.longboard.rating}`;
+                SecurityUtils.safeSetHTML(scoreSpan, `评分: ${item.longboard.score}`);
+                
+                const waveSpan = document.createElement('span');
+                waveSpan.className = 'wave-info';
+                SecurityUtils.safeSetHTML(waveSpan, `总浪: ${item.waveData.totalWaveHeight || item.waveData.waveHeight}m`);
+                
+                infoDiv.appendChild(scoreSpan);
+                infoDiv.appendChild(waveSpan);
+                
+                const recDiv = document.createElement('div');
+                recDiv.className = 'recommendation';
+                SecurityUtils.safeSetHTML(recDiv, getLongboardRecommendation(item.longboard.score));
+                
+                cardDiv.appendChild(nameDiv);
+                cardDiv.appendChild(infoDiv);
+                cardDiv.appendChild(recDiv);
+                longboardElement.appendChild(cardDiv);
+            });
+            
+            // 安全渲染短板推荐
             const shortboardElement = document.getElementById('shortboard-recommendations');
-            shortboardElement.innerHTML = ''; // 清空
-            shortboardElement.insertAdjacentHTML('beforeend', shortboardHtml);
+            shortboardElement.innerHTML = '';
+            
+            topShortboard.forEach(item => {
+                const cardDiv = document.createElement('div');
+                cardDiv.className = 'spot-card';
+                
+                const nameDiv = document.createElement('div');
+                nameDiv.className = 'spot-name';
+                SecurityUtils.safeSetHTML(nameDiv, item.spot.name);
+                
+                const infoDiv = document.createElement('div');
+                infoDiv.className = 'spot-info';
+                
+                const scoreSpan = document.createElement('span');
+                scoreSpan.className = `spot-score score-${item.shortboard.rating}`;
+                SecurityUtils.safeSetHTML(scoreSpan, `评分: ${item.shortboard.score}`);
+                
+                const waveSpan = document.createElement('span');
+                waveSpan.className = 'wave-info';
+                SecurityUtils.safeSetHTML(waveSpan, `总浪: ${item.waveData.totalWaveHeight || item.waveData.waveHeight}m`);
+                
+                infoDiv.appendChild(scoreSpan);
+                infoDiv.appendChild(waveSpan);
+                
+                const recDiv = document.createElement('div');
+                recDiv.className = 'recommendation';
+                SecurityUtils.safeSetHTML(recDiv, getShortboardRecommendation(item.shortboard.score));
+                
+                cardDiv.appendChild(nameDiv);
+                cardDiv.appendChild(infoDiv);
+                cardDiv.appendChild(recDiv);
+                shortboardElement.appendChild(cardDiv);
+            });
         }
 
         // 加载预测数据

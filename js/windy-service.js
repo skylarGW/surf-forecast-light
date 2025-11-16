@@ -55,9 +55,11 @@ class WindyService {
         const requestPromise = fetch(this.apiEndpoint, {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json'
+                'Content-Type': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest' // CSRF防护
             },
-            body: JSON.stringify({ lat, lng })
+            body: JSON.stringify({ lat, lng }),
+            credentials: 'same-origin' // 防止CSRF
         }).then(async response => {
             console.log('API Response Status:', response.status);
             console.log('API Response Headers:', Object.fromEntries(response.headers.entries()));

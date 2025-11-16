@@ -6,16 +6,38 @@ const MAX_DAILY_REQUESTS = 30; // 每日最大请求数
 
 export default async function handler(req, res) {
   console.log('=== Windy Proxy Function Called ===');
-  console.log('Method:', req.method);
-  console.log('Headers:', req.headers);
-  console.log('Body:', req.body);
-  console.log('Environment WINDY_API_KEY exists:', !!process.env.WINDY_API_KEY);
   
-  // CORS设置
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  // CSRF防护 - 验证请求来源
+  const origin = req.headers.origin || req.headers.referer;
+  const allowedOrigins = [
+    'https://surf-forecast-light.vercel.app',
+    'https://localhost:3000',
+    'http://localhost:3000',
+    'http://127.0.0.1:5500' // 开发环境
+  ];
+  
+  // 生产环境严格验证来源
+  if (process.env.NODE_ENV === 'production' && origin) {
+    const isAllowed = allowedOrigins.some(allowed => 
+      origin.startsWith(allowed)
+    );
+    if (!isAllowed) {
+      console.warn('Blocked request from unauthorized origin:', origin);
+      return res.status(403).json({ error: 'Forbidden: Invalid origin' });
+    }
+  }
+  
+  // 安全的CORS设置
+  const allowedOrigin = allowedOrigins.find(allowed => 
+    origin && origin.startsWith(allowed)
+  ) || allowedOrigins[0];
+  
+  res.setHeader('Access-Control-Allow-Origin', allowedOrigin);
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-  res.setHeader('Cache-Control', 'public, max-age=21600'); // 6小时缓存
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-Requested-With');
+  res.setHeader('Cache-Control', 'public, max-age=21600');
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
   
   if (req.method === 'OPTIONS') {
     console.log('OPTIONS request handled');
@@ -26,14 +48,27 @@ export default async function handler(req, res) {
     console.log('Method not allowed:', req.method);
     return res.status(405).json({ error: 'Method not allowed' });
   }
+  
+  // CSRF防护 - 验证请求头
+  const contentType = req.headers['content-type'];
+  if (!contentType || !contentType.includes('application/json')) {
+    return res.status(400).json({ error: 'Invalid content type' });
+  }
 
   try {
     const { lat, lng } = req.body;
     
-    // 输入验证
-    if (!lat || !lng || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+    // 严格的输入验证
+    if (!lat || !lng || 
+        typeof lat !== 'number' || typeof lng !== 'number' ||
+        lat < -90 || lat > 90 || lng < -180 || lng > 180 ||
+        !isFinite(lat) || !isFinite(lng)) {
       return res.status(400).json({ error: 'Invalid coordinates' });
     }
+    
+    // 防止数值注入
+    const safeLat = Math.round(lat * 1000000) / 1000000; // 6位小数
+    const safeLng = Math.round(lng * 1000000) / 1000000;
 
     // 生成缓存键（精度到0.1度减少API调用）
     const roundedLat = Math.round(lat * 10) / 10;
@@ -69,12 +104,25 @@ export default async function handler(req, res) {
     
     console.log('Calling Windy API with coordinates:', roundedLat, roundedLng);
     
-    // 调用Windy API - 使用正确的端点
+    // SSRF防护 - 只允许访问Windy API
+    const ALLOWED_API_HOST = 'api.windy.com';
     const apiUrl = 'https://api.windy.com/api/point-forecast/v2';
-    // 使用gfsWave模型获取海浪数据
+    
+    // 验证API URL
+    try {
+      const url = new URL(apiUrl);
+      if (url.hostname !== ALLOWED_API_HOST) {
+        throw new Error('Unauthorized API host');
+      }
+    } catch (error) {
+      console.error('Invalid API URL:', error.message);
+      return res.status(400).json({ error: 'Invalid API configuration' });
+    }
+    
+    // 使用安全的坐标值
     const requestBody = {
-      lat: roundedLat,
-      lon: roundedLng,
+      lat: safeLat,
+      lon: safeLng,
       model: 'gfsWave',
       parameters: ['waves', 'windWaves', 'swell1'],
       levels: ['surface'],
@@ -85,12 +133,16 @@ export default async function handler(req, res) {
     console.log('- URL:', apiUrl);
     console.log('- Request body:', JSON.stringify(requestBody, null, 2));
     
+    // 安全的HTTP请求配置
     const response = await fetch(apiUrl, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
+        'User-Agent': 'SurfForecast/1.0'
       },
-      body: JSON.stringify(requestBody)
+      body: JSON.stringify(requestBody),
+      // 防止请求超时
+      signal: AbortSignal.timeout(10000) // 10秒超时
     });
     
     console.log('Windy API response status:', response.status);
