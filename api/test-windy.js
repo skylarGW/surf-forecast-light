@@ -37,8 +37,8 @@ export default async function handler(req, res) {
     const requestBody = {
       lat: testLat,
       lon: testLng,
-      model: 'waves',
-      parameters: ['waves', 'wind', 'windDir', 'period'],
+      model: 'gfsWave',
+      parameters: ['waves', 'period'],
       levels: ['surface'],
       key: apiKey
     };

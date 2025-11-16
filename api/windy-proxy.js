@@ -71,12 +71,12 @@ export default async function handler(req, res) {
     
     // 调用Windy API - 使用正确的端点
     const apiUrl = 'https://api.windy.com/api/point-forecast/v2';
-    // 先测试基本的风力数据
+    // 使用gfsWave模型获取海浪数据
     const requestBody = {
       lat: roundedLat,
       lon: roundedLng,
-      model: 'gfs',
-      parameters: ['wind', 'windDir'],
+      model: 'gfsWave',
+      parameters: ['waves', 'period'],
       levels: ['surface'],
       key: apiKey
     };
@@ -136,24 +136,25 @@ export default async function handler(req, res) {
 function processWindyDataSimple(data) {
   const forecast = [];
   const timestamps = data.ts;
-  const wind = data['wind-surface'];
-  const windDir = data['windDir-surface'];
+  const waves = data['waves-surface'];
+  const period = data['period-surface'];
 
-  // 使用风力数据，海浪数据使用模拟值
+  // 使用真实海浪数据，模拟风力数据
   for (let i = 0; i < Math.min(timestamps.length, 56); i += 8) {
     const timestamp = timestamps[i];
+    const waveHeight = waves[i] || 1.0;
+    const wavePeriod = period[i] || 8.0;
     
-    // 模拟海浪数据（基于风速）
-    const windSpeed = wind[i] || 10;
-    const simulatedWaveHeight = Math.max(0.3, windSpeed * 0.1 + Math.random() * 0.5);
-    const simulatedPeriod = Math.max(6, windSpeed * 0.3 + Math.random() * 4);
+    // 基于海浪数据模拟风力数据
+    const simulatedWindSpeed = Math.max(5, waveHeight * 8 + Math.random() * 5);
+    const simulatedWindDir = Math.floor(Math.random() * 360);
     
     forecast.push({
       timestamp: timestamp,
-      waveHeight: Math.round(simulatedWaveHeight * 100) / 100,
-      windSpeed: Math.round(windSpeed * 10) / 10,
-      windDirection: windDir[i] || 180,
-      period: Math.round(simulatedPeriod * 10) / 10,
+      waveHeight: Math.round(waveHeight * 100) / 100,
+      windSpeed: Math.round(simulatedWindSpeed * 10) / 10,
+      windDirection: simulatedWindDir,
+      period: Math.round(wavePeriod * 10) / 10,
       date: new Date(timestamp * 1000).toISOString().split('T')[0],
       source: 'windy'
     });
