@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>环境变量测试</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .section { margin: 20px 0; padding: 20px; border: 1px solid #ccc; border-radius: 8px; }
+        .result { background: #f5f5f5; padding: 15px; margin: 10px 0; border-radius: 4px; }
+        .error { background: #ffe6e6; color: #d00; }
+        .success { background: #e6ffe6; color: #080; }
+        .warning { background: #fff3cd; color: #856404; }
+        button { padding: 10px 20px; margin: 5px; cursor: pointer; }
+        pre { white-space: pre-wrap; word-wrap: break-word; max-height: 400px; overflow-y: auto; }
+        .highlight { background: #ffff99; padding: 2px 4px; }
+    </style>
+</head>
+<body>
+    <h1>🔍 环境变量诊断</h1>
+    
+    <div class="section">
+        <h2>检查WINDY_API_KEY环境变量</h2>
+        <button onclick="testEnvironment()">检查环境变量</button>
+        <div id="env-result" class="result"></div>
+    </div>
+
+    <script>
+        function log(elementId, message, type = 'success') {
+            const element = document.getElementById(elementId);
+            element.innerHTML = `<pre>${message}</pre>`;
+            element.className = `result ${type}`;
+        }
+
+        async function testEnvironment() {
+            try {
+                console.log('开始环境变量测试...');
+                
+                const response = await fetch('/api/env-test', {
+                    method: 'GET'
+                });
+                
+                const responseText = await response.text();
+                console.log('环境测试响应:', responseText);
+                
+                let data;
+                try {
+                    data = JSON.parse(responseText);
+                } catch (parseError) {
+                    throw new Error(`JSON解析失败: ${parseError.message}\n原始响应: ${responseText}`);
+                }
+                
+                if (data.success) {
+                    const env = data.environment;
+                    let message = `=== 环境变量诊断结果 ===\n\n`;
+                    
+                    message += `总环境变量数: ${env.totalEnvVars}\n`;
+                    message += `Windy相关变量: ${JSON.stringify(env.windyRelatedVars, null, 2)}\n\n`;
+                    
+                    message += `=== WINDY_API_KEY 检查 ===\n`;
+                    message += `存在: ${env.windyApiKeyExists}\n`;
+                    message += `长度: ${env.windyApiKeyLength}\n`;
+                    message += `预览: ${env.windyApiKeyPreview || 'N/A'}\n\n`;
+                    
+                    message += `=== 可能的变量名变体 ===\n`;
+                    const variants = env.possibleVariants;
+                    if (Object.keys(variants).length > 0) {
+                        Object.entries(variants).forEach(([name, info]) => {
+                            message += `${name}: 存在 (长度: ${info.length}, 预览: ${info.firstChars})\n`;
+                        });
+                    } else {
+                        message += `未找到任何WINDY_API_KEY变体\n`;
+                    }
+                    
+                    message += `\n=== 环境信息 ===\n`;
+                    message += `NODE_ENV: ${env.nodeEnv || 'undefined'}\n`;
+                    message += `VERCEL_ENV: ${env.vercelEnv || 'undefined'}\n`;
+                    message += `时间戳: ${env.timestamp}\n`;
+                    
+                    // 判断问题类型
+                    let resultType = 'success';
+                    if (!env.windyApiKeyExists) {
+                        message += `\n❌ 问题诊断: WINDY_API_KEY 环境变量不存在\n`;
+                        message += `\n🔧 解决方案:\n`;
+                        message += `1. 登录 Vercel 控制台\n`;
+                        message += `2. 进入项目 Settings > Environment Variables\n`;
+                        message += `3. 添加 WINDY_API_KEY 环境变量\n`;
+                        message += `4. 确保 Environment 设置为 "Production"\n`;
+                        message += `5. 重新部署项目\n`;
+                        resultType = 'error';
+                    } else if (env.windyApiKeyLength < 10) {
+                        message += `\n⚠️ 问题诊断: WINDY_API_KEY 长度异常 (${env.windyApiKeyLength} 字符)\n`;
+                        message += `正常的 Windy API Key 应该是较长的字符串\n`;
+                        resultType = 'warning';
+                    } else {
+                        message += `\n✅ WINDY_API_KEY 环境变量配置正常\n`;
+                        message += `如果仍然无法调用API，问题可能在于:\n`;
+                        message += `1. API Key 无效或被禁用\n`;
+                        message += `2. Windy API 服务器连接问题\n`;
+                        message += `3. API 请求格式问题\n`;
+                    }
+                    
+                    log('env-result', message, resultType);
+                } else {
+                    log('env-result', `环境测试失败:\n${data.error}\n${data.stack}`, 'error');
+                }
+                
+            } catch (error) {
+                console.error('环境测试出错:', error);
+                log('env-result', `环境测试出错:\n${error.message}\n${error.stack}`, 'error');
+            }
+        }
+
+        // 页面加载时自动运行测试
+        window.addEventListener('load', () => {
+            testEnvironment();
+        });
+    </script>
+</body>
+</html>

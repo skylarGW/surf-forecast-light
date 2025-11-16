@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>API调试 - 服务器端日志</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .section { margin: 20px 0; padding: 20px; border: 1px solid #ccc; border-radius: 8px; }
+        .result { background: #f5f5f5; padding: 15px; margin: 10px 0; border-radius: 4px; }
+        .error { background: #ffe6e6; color: #d00; }
+        .success { background: #e6ffe6; color: #080; }
+        button { padding: 10px 20px; margin: 5px; cursor: pointer; }
+        pre { white-space: pre-wrap; word-wrap: break-word; max-height: 400px; overflow-y: auto; }
+    </style>
+</head>
+<body>
+    <h1>🔍 API调试 - 服务器端详细信息</h1>
+    
+    <div class="section">
+        <h2>检查服务器端错误</h2>
+        <p>这个测试会强制触发API调用并显示服务器端的详细错误信息</p>
+        <button onclick="debugServerError()">获取服务器端错误详情</button>
+        <div id="server-debug" class="result"></div>
+    </div>
+
+    <script>
+        function log(elementId, message, isError = false) {
+            const element = document.getElementById(elementId);
+            element.innerHTML = `<pre>${message}</pre>`;
+            element.className = `result ${isError ? 'error' : 'success'}`;
+        }
+
+        async function debugServerError() {
+            try {
+                console.log('开始服务器端调试...');
+                
+                // 使用一个新的坐标确保不会命中缓存
+                const testCoords = {
+                    lat: 18.527192 + Math.random() * 0.001,
+                    lng: 110.107462 + Math.random() * 0.001
+                };
+                
+                console.log('测试坐标:', testCoords);
+                
+                const response = await fetch('/api/windy-proxy', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(testCoords)
+                });
+                
+                console.log('响应状态:', response.status);
+                console.log('响应头:', Object.fromEntries(response.headers.entries()));
+                
+                const responseText = await response.text();
+                console.log('原始响应:', responseText);
+                
+                let data;
+                try {
+                    data = JSON.parse(responseText);
+                } catch (parseError) {
+                    throw new Error(`JSON解析失败: ${parseError.message}\n原始响应: ${responseText}`);
+                }
+                
+                // 分析响应数据
+                const analysis = {
+                    responseStatus: response.status,
+                    dataSource: data.forecast?.[0]?.source,
+                    forecastCount: data.forecast?.length,
+                    hasWindyData: data.forecast?.some(f => f.source === 'windy'),
+                    allFallback: data.forecast?.every(f => f.source === 'fallback'),
+                    serverHeaders: Object.fromEntries(response.headers.entries()),
+                    sampleForecast: data.forecast?.[0],
+                    fullResponse: data
+                };
+                
+                let message = `=== 服务器端调试结果 ===\n\n`;
+                message += `响应状态: ${analysis.responseStatus}\n`;
+                message += `数据源: ${analysis.dataSource}\n`;
+                message += `预测点数: ${analysis.forecastCount}\n`;
+                message += `包含Windy数据: ${analysis.hasWindyData}\n`;
+                message += `全部为备用数据: ${analysis.allFallback}\n\n`;
+                
+                message += `=== 关键发现 ===\n`;
+                if (analysis.allFallback) {
+                    message += `❌ 所有数据都是备用数据，说明Windy API调用失败\n`;
+                    message += `可能原因:\n`;
+                    message += `1. WINDY_API_KEY环境变量未设置或错误\n`;
+                    message += `2. API Key无效或被禁用\n`;
+                    message += `3. Windy API服务器连接失败\n`;
+                    message += `4. API请求格式错误\n\n`;
+                }
+                
+                message += `=== 服务器响应头 ===\n`;
+                message += JSON.stringify(analysis.serverHeaders, null, 2) + '\n\n';
+                
+                message += `=== 示例预测数据 ===\n`;
+                message += JSON.stringify(analysis.sampleForecast, null, 2) + '\n\n';
+                
+                message += `=== 完整响应数据 ===\n`;
+                message += JSON.stringify(analysis.fullResponse, null, 2);
+                
+                log('server-debug', message, analysis.allFallback);
+                
+            } catch (error) {
+                console.error('调试过程出错:', error);
+                log('server-debug', `调试过程出错:\n${error.message}\n${error.stack}`, true);
+            }
+        }
+
+        // 页面加载时自动运行
+        window.addEventListener('load', () => {
+            debugServerError();
+        });
+    </script>
+</body>
+</html>
