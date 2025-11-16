@@ -5,6 +5,12 @@ const CACHE_DURATION = 6 * 60 * 60 * 1000; // 6小时缓存
 const MAX_DAILY_REQUESTS = 30; // 每日最大请求数
 
 export default async function handler(req, res) {
+  console.log('=== Windy Proxy Function Called ===');
+  console.log('Method:', req.method);
+  console.log('Headers:', req.headers);
+  console.log('Body:', req.body);
+  console.log('Environment WINDY_API_KEY exists:', !!process.env.WINDY_API_KEY);
+  
   // CORS设置
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -12,10 +18,12 @@ export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'public, max-age=21600'); // 6小时缓存
   
   if (req.method === 'OPTIONS') {
+    console.log('OPTIONS request handled');
     return res.status(200).end();
   }
 
   if (req.method !== 'POST') {
+    console.log('Method not allowed:', req.method);
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
@@ -46,6 +54,14 @@ export default async function handler(req, res) {
       return res.status(200).json(fallbackData);
     }
 
+    // 检查API Key
+    if (!process.env.WINDY_API_KEY) {
+      console.error('WINDY_API_KEY not found in environment variables');
+      throw new Error('API Key not configured');
+    }
+    
+    console.log('Calling Windy API with coordinates:', roundedLat, roundedLng);
+    
     // 调用Windy API
     const response = await fetch('https://api.windy.com/api/point-forecast/v2', {
       method: 'POST',
@@ -61,16 +77,22 @@ export default async function handler(req, res) {
         key: process.env.WINDY_API_KEY
       })
     });
+    
+    console.log('Windy API response status:', response.status);
 
     requestCount++;
     console.log(`API call ${requestCount}/${MAX_DAILY_REQUESTS}`);
 
     if (!response.ok) {
-      throw new Error(`Windy API error: ${response.status}`);
+      const errorText = await response.text();
+      console.error('Windy API error response:', errorText);
+      throw new Error(`Windy API error: ${response.status} - ${errorText}`);
     }
 
     const data = await response.json();
+    console.log('Windy API data received:', Object.keys(data));
     const processedData = processWindyData(data);
+    console.log('Processed data:', processedData.forecast.length, 'forecast points');
     
     // 缓存数据
     cache.set(cacheKey, {
@@ -80,9 +102,14 @@ export default async function handler(req, res) {
     
     res.status(200).json(processedData);
   } catch (error) {
-    console.error('API Error:', error);
+    console.error('API Error Details:', {
+      message: error.message,
+      stack: error.stack,
+      requestBody: req.body
+    });
     // 降级到备用数据
     const fallbackData = generateFallbackData(req.body.lat, req.body.lng);
+    console.log('Returning fallback data with', fallbackData.forecast.length, 'points');
     res.status(200).json(fallbackData);
   }
 }

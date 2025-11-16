@@ -41,9 +41,14 @@ class WindyService {
     }
 
     async fetchRealData(lat, lng) {
+        console.log('=== Fetching Real Data ===');
+        console.log('Coordinates:', lat, lng);
+        console.log('API Endpoint:', this.apiEndpoint);
+        
         // 检查是否有正在进行的相同请求
         const requestKey = `${lat},${lng}`;
         if (this.batchRequests.has(requestKey)) {
+            console.log('Using existing request for:', requestKey);
             return await this.batchRequests.get(requestKey);
         }
 
@@ -54,13 +59,20 @@ class WindyService {
             },
             body: JSON.stringify({ lat, lng })
         }).then(async response => {
+            console.log('API Response Status:', response.status);
+            console.log('API Response Headers:', Object.fromEntries(response.headers.entries()));
+            
             if (!response.ok) {
-                throw new Error(`API request failed: ${response.status}`);
+                const errorText = await response.text();
+                console.error('API Error Response:', errorText);
+                throw new Error(`API request failed: ${response.status} - ${errorText}`);
             }
             const data = await response.json();
+            console.log('API Response Data:', data);
             this.batchRequests.delete(requestKey);
             return data;
         }).catch(error => {
+            console.error('Fetch Error:', error);
             this.batchRequests.delete(requestKey);
             throw error;
         });
@@ -93,7 +105,8 @@ class WindyService {
                 windSpeed: Math.round((5 + Math.random() * 15) * 10) / 10,
                 windDirection: Math.round(Math.random() * 360),
                 period: Math.round((6 + Math.random() * 8) * 10) / 10,
-                date: new Date(timestamp).toISOString().split('T')[0]
+                date: new Date(timestamp).toISOString().split('T')[0],
+                source: 'fallback'
             });
         }
 
