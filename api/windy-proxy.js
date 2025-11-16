@@ -110,8 +110,16 @@ export default async function handler(req, res) {
 
     const data = await response.json();
     console.log('Windy API data received:', Object.keys(data));
+    console.log('Raw Windy data sample:', {
+      ts: data.ts ? data.ts.slice(0, 3) : 'missing',
+      'waves-surface': data['waves-surface'] ? data['waves-surface'].slice(0, 3) : 'missing',
+      'windWaves-surface': data['windWaves-surface'] ? data['windWaves-surface'].slice(0, 3) : 'missing',
+      'swell1-surface': data['swell1-surface'] ? data['swell1-surface'].slice(0, 3) : 'missing'
+    });
+    
     const processedData = processWindyDataSimple(data);
     console.log('Processed data:', processedData.forecast.length, 'forecast points');
+    console.log('First processed point:', processedData.forecast[0]);
     
     // 缓存数据
     cache.set(cacheKey, {
@@ -134,11 +142,24 @@ export default async function handler(req, res) {
 }
 
 function processWindyDataSimple(data) {
+  console.log('Processing Windy data...');
   const forecast = [];
   const timestamps = data.ts;
   const waves = data['waves-surface'];
   const windWaves = data['windWaves-surface'];
   const swell1 = data['swell1-surface'];
+
+  console.log('Data arrays check:', {
+    timestamps: timestamps ? timestamps.length : 'missing',
+    waves: waves ? waves.length : 'missing',
+    windWaves: windWaves ? windWaves.length : 'missing',
+    swell1: swell1 ? swell1.length : 'missing'
+  });
+
+  if (!timestamps || !waves) {
+    console.error('Missing required data arrays');
+    throw new Error('Invalid Windy API response: missing timestamps or waves data');
+  }
 
   // 使用真实海浪数据，模拟风力数据
   for (let i = 0; i < Math.min(timestamps.length, 56); i += 8) {
