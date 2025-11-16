@@ -55,27 +55,41 @@ export default async function handler(req, res) {
     }
 
     // 检查API Key
-    if (!process.env.WINDY_API_KEY) {
+    const apiKey = process.env.WINDY_API_KEY;
+    console.log('Environment variables check:');
+    console.log('- WINDY_API_KEY exists:', !!apiKey);
+    console.log('- WINDY_API_KEY length:', apiKey ? apiKey.length : 0);
+    console.log('- WINDY_API_KEY first 10 chars:', apiKey ? apiKey.substring(0, 10) + '...' : 'N/A');
+    
+    if (!apiKey) {
       console.error('WINDY_API_KEY not found in environment variables');
+      console.error('Available env vars:', Object.keys(process.env).filter(key => key.includes('WINDY')));
       throw new Error('API Key not configured');
     }
     
     console.log('Calling Windy API with coordinates:', roundedLat, roundedLng);
     
-    // 调用Windy API
-    const response = await fetch('https://api.windy.com/api/point-forecast/v2', {
+    // 调用Windy API - 使用正确的端点
+    const apiUrl = 'https://api.windy.com/api/point-forecast/v2';
+    const requestBody = {
+      lat: roundedLat,
+      lon: roundedLng,
+      model: 'gfs',
+      parameters: ['waves', 'wind', 'windDir', 'period'],
+      levels: ['surface'],
+      key: apiKey
+    };
+    
+    console.log('Windy API request details:');
+    console.log('- URL:', apiUrl);
+    console.log('- Request body:', JSON.stringify(requestBody, null, 2));
+    
+    const response = await fetch(apiUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({
-        lat: roundedLat,
-        lon: roundedLng,
-        model: 'gfs',
-        parameters: ['waves', 'wind', 'windDir', 'period'],
-        levels: ['surface'],
-        key: process.env.WINDY_API_KEY
-      })
+      body: JSON.stringify(requestBody)
     });
     
     console.log('Windy API response status:', response.status);
@@ -85,7 +99,11 @@ export default async function handler(req, res) {
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('Windy API error response:', errorText);
+      console.error('Windy API error details:');
+      console.error('- Status:', response.status);
+      console.error('- Status Text:', response.statusText);
+      console.error('- Response Headers:', Object.fromEntries(response.headers.entries()));
+      console.error('- Error Body:', errorText);
       throw new Error(`Windy API error: ${response.status} - ${errorText}`);
     }
 
