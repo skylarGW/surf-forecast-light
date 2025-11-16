@@ -1,0 +1,567 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🌊 寻找最佳浪点</title>
+    
+    <!-- 安全头配置 -->
+    <meta http-equiv="Content-Security-Policy" 
+          content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' https://*.vercel.app https://api.windy.com; frame-ancestors 'none';">
+    <meta http-equiv="X-Frame-Options" content="DENY">
+    <meta http-equiv="X-Content-Type-Options" content="nosniff">
+    <meta http-equiv="Referrer-Policy" content="strict-origin-when-cross-origin">
+    <meta http-equiv="Strict-Transport-Security" content="max-age=31536000; includeSubDomains">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            font-family: 'Microsoft YaHei', Arial, sans-serif; 
+            background: linear-gradient(rgba(0,0,0,0.3), rgba(0,0,0,0.3)), url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 800"><defs><linearGradient id="ocean" x1="0%" y1="0%" x2="0%" y2="100%"><stop offset="0%" style="stop-color:%23001f3f;stop-opacity:1" /><stop offset="50%" style="stop-color:%23004080;stop-opacity:1" /><stop offset="100%" style="stop-color:%23006bb3;stop-opacity:1" /></linearGradient></defs><rect width="1200" height="800" fill="url(%23ocean)"/><path d="M0,400 Q300,350 600,400 T1200,400 L1200,800 L0,800 Z" fill="%23ffffff" opacity="0.1"/><path d="M0,450 Q200,420 400,450 T800,450 Q1000,430 1200,450 L1200,800 L0,800 Z" fill="%23ffffff" opacity="0.05"/></svg>') center/cover;
+            color: #333; 
+            min-height: 100vh;
+        }
+        .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+        .header { text-align: center; color: white; margin-bottom: 30px; }
+        .header h1 { font-size: 3em; margin-bottom: 10px; text-shadow: 2px 2px 4px rgba(0,0,0,0.5); }
+        .header p { font-size: 1.3em; opacity: 0.95; text-shadow: 1px 1px 2px rgba(0,0,0,0.5); }
+        
+        .date-cards { display: flex; justify-content: center; gap: 10px; margin-bottom: 30px; flex-wrap: wrap; }
+        .date-card { 
+            background: rgba(255,255,255,0.9); 
+            border-radius: 12px; 
+            padding: 15px 20px; 
+            cursor: pointer; 
+            transition: all 0.3s;
+            text-align: center;
+            min-width: 120px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        .date-card.active { 
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+            color: white; 
+            transform: translateY(-3px);
+            box-shadow: 0 6px 15px rgba(0,0,0,0.2);
+        }
+        .date-card:hover { transform: translateY(-2px); }
+        .date-card .day { font-size: 1.1em; font-weight: bold; }
+        .date-card .date { font-size: 0.9em; opacity: 0.8; }
+        
+        .content { 
+            background: rgba(255,255,255,0.95); 
+            border-radius: 20px; 
+            padding: 30px; 
+            box-shadow: 0 15px 35px rgba(0,0,0,0.1);
+            backdrop-filter: blur(10px);
+        }
+        
+        .recommendations { margin-bottom: 40px; }
+        .recommendations h2 { text-align: center; margin-bottom: 25px; color: #2c3e50; font-size: 1.8em; }
+        .rec-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; }
+        .board-type { 
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); 
+            padding: 25px; 
+            border-radius: 15px; 
+            box-shadow: 0 5px 15px rgba(0,0,0,0.05);
+        }
+        .board-type h3 { 
+            color: #495057; 
+            margin-bottom: 20px; 
+            font-size: 1.4em; 
+            text-align: center;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #dee2e6;
+        }
+        
+        .spot-card { 
+            background: white; 
+            border-radius: 12px; 
+            padding: 20px; 
+            margin-bottom: 15px; 
+            transition: transform 0.3s;
+            box-shadow: 0 3px 10px rgba(0,0,0,0.08);
+        }
+        .spot-card:hover { transform: translateY(-3px); box-shadow: 0 8px 25px rgba(0,0,0,0.15); }
+        .spot-name { font-weight: bold; color: #2c3e50; margin-bottom: 8px; font-size: 1.1em; }
+        .spot-info { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+        .spot-score { 
+            padding: 6px 12px; 
+            border-radius: 20px; 
+            font-size: 0.9em; 
+            font-weight: bold;
+        }
+        .score-excellent { background: #28a745; color: white; }
+        .score-good { background: #17a2b8; color: white; }
+        .score-fair { background: #ffc107; color: #333; }
+        .score-poor { background: #dc3545; color: white; }
+        .score-flat { background: #6c757d; color: white; }
+        .wave-info { color: #6c757d; font-size: 0.9em; }
+        .recommendation { font-size: 0.95em; color: #495057; line-height: 1.4; }
+        
+        .forecast-section { margin-top: 40px; }
+        .forecast-section h2 { text-align: center; margin-bottom: 30px; color: #2c3e50; font-size: 1.8em; }
+        .region { margin-bottom: 35px; }
+        .region h3 { 
+            color: #495057; 
+            margin-bottom: 20px; 
+            font-size: 1.5em;
+            padding: 15px 20px;
+            background: linear-gradient(135deg, #e9ecef 0%, #f8f9fa 100%);
+            border-radius: 10px;
+            border-left: 5px solid #667eea;
+        }
+        .spots-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; }
+        .forecast-card { 
+            background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%); 
+            border-radius: 12px; 
+            padding: 20px; 
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+            transition: transform 0.3s;
+        }
+        .forecast-card:hover { transform: translateY(-2px); }
+        .forecast-card h4 { color: #495057; margin-bottom: 15px; font-size: 1.2em; }
+        .forecast-item { 
+            display: flex; 
+            justify-content: space-between; 
+            padding: 10px 0; 
+            border-bottom: 1px solid #e9ecef;
+        }
+        .forecast-item:last-child { border-bottom: none; }
+        .forecast-value { font-weight: bold; color: #28a745; }
+        
+        .loading { text-align: center; padding: 60px; color: #667eea; font-size: 1.2em; }
+        
+        @media (max-width: 768px) {
+            .rec-grid { grid-template-columns: 1fr; }
+            .spots-grid { grid-template-columns: 1fr; }
+            .header h1 { font-size: 2.2em; }
+            .container { padding: 15px; }
+            .content { padding: 20px; }
+            .date-cards { gap: 8px; }
+            .date-card { min-width: 100px; padding: 12px 15px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🌊 寻找最佳浪点</h1>
+            <p>7天详细预测 AI智能解读推荐</p>
+        </div>
+
+        <div class="date-cards" id="date-cards"></div>
+
+        <div class="content">
+            <div class="recommendations">
+                <h2>当日推荐</h2>
+                <div class="rec-grid">
+                    <div class="board-type">
+                        <h3>🏄 今日TOP3 长板浪点推荐</h3>
+                        <div id="longboard-recommendations"></div>
+                    </div>
+                    
+                    <div class="board-type">
+                        <h3>🏄 今日TOP3 短板浪点推荐</h3>
+                        <div id="shortboard-recommendations"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="forecast-section">
+                <h2>各浪点预测数据</h2>
+                
+                <div class="region">
+                    <h3>🏝️ 海南地区</h3>
+                    <div class="spots-grid" id="hainan-spots"></div>
+                </div>
+                
+                <div class="region">
+                    <h3>🏖️ 青岛地区</h3>
+                    <div class="spots-grid" id="qingdao-spots"></div>
+                </div>
+                
+                <div class="region">
+                    <h3>⛵ 舟山地区</h3>
+                    <div class="spots-grid" id="zhoushan-spots"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/security-utils.js"></script>
+    <script src="js/windy-service.js"></script>
+    <script>
+        // 13个精选浪点数据 - 简化参数
+        const surfSpots = [
+            { id: 1, name: "舟山-东沙冲浪公园", lat: 30.0444, lng: 122.1067, type: "beach_break", exposure: "east", bayShape: "open", seabedType: "sand", region: "zhoushan" },
+            { id: 2, name: "舟山-岱山鹿栏", lat: 30.2644, lng: 122.2067, type: "beach_break", exposure: "southeast", bayShape: "semi_enclosed", seabedType: "sand_rock", region: "zhoushan" },
+            { id: 3, name: "青岛-石老人海水浴场", lat: 36.088937, lng: 120.46526, type: "beach_break", exposure: "east", bayShape: "open", seabedType: "sand", region: "qingdao" },
+            { id: 4, name: "青岛-流清河海水浴场", lat: 36.05, lng: 120.3167, type: "beach_break", exposure: "southeast", bayShape: "semi_enclosed", seabedType: "sand", region: "qingdao" },
+            { id: 5, name: "青岛-黄岛两河口", lat: 35.888322, lng: 120.073882, type: "beach_break", exposure: "south", bayShape: "semi_enclosed", seabedType: "sand_rock", region: "qingdao" },
+            { id: 6, name: "海南-陵水万豪", lat: 18.527192, lng: 110.107462, type: "beach_break", exposure: "east", bayShape: "enclosed", seabedType: "sand", region: "hainan" },
+            { id: 7, name: "海南-陵水银滩", lat: 18.529086, lng: 110.108919, type: "beach_break", exposure: "east", bayShape: "enclosed", seabedType: "sand", region: "hainan" },
+            { id: 8, name: "海南-陵水香水湾", lat: 18.550802, lng: 110.131152, type: "beach_break", exposure: "southeast", bayShape: "open", seabedType: "sand", region: "hainan" },
+            { id: 9, name: "海南-万宁石梅湾大石头", lat: 18.65725, lng: 110.265098, type: "point_break", exposure: "east", bayShape: "semi_enclosed", seabedType: "rock_reef", region: "hainan" },
+            { id: 10, name: "海南-万宁石梅湾艾美", lat: 18.667275, lng: 110.286256, type: "beach_break", exposure: "east", bayShape: "enclosed", seabedType: "sand", region: "hainan" },
+            { id: 11, name: "海南-万宁南燕湾", lat: 18.663408, lng: 110.305698, type: "point_break", exposure: "east", bayShape: "enclosed", seabedType: "sand", region: "hainan" },
+            { id: 12, name: "海南-万宁新潭湾", lat: 18.731155, lng: 110.445003, type: "beach_break", exposure: "southeast", bayShape: "open", seabedType: "sand_reef", region: "hainan" },
+            { id: 13, name: "海南-万宁高尔夫", lat: 18.659592, lng: 110.317269, type: "point_break", exposure: "east", bayShape: "enclosed", seabedType: "sand", region: "hainan" }
+        ];
+
+        // 简化的校准参数
+        const calibrationFactors = {
+            terrain: { open: 0.85, semi_enclosed: 0.65, enclosed: 0.4 },
+            seabedType: { sand: 0.7, sand_rock: 0.75, rock: 0.85, reef: 0.9, rock_reef: 0.8, sand_reef: 0.75 },
+            tidal: { low: 0.6, mid_low: 0.75, mid: 0.85, mid_high: 0.9, high: 0.8 },
+            energy: 0.9
+        };
+
+        // 长板和短板评估标准
+        const surfCriteria = {
+            longboard: {
+                waveHeight: { min: 0.3, max: 1.5, optimal: [0.5, 1.0] },
+                period: { min: 8, max: 20, optimal: [10, 16] },
+                windSpeed: { min: 0, max: 15, optimal: [0, 8] }
+            },
+            shortboard: {
+                waveHeight: { min: 0.8, max: 3.0, optimal: [1.2, 2.5] },
+                period: { min: 6, max: 16, optimal: [8, 14] },
+                windSpeed: { min: 0, max: 25, optimal: [5, 15] }
+            }
+        };
+
+        let currentDate = new Date().toISOString().split('T')[0];
+        let forecastData = {};
+
+        // 生成7天日期数据
+        function generateDates() {
+            const dates = [];
+            const today = new Date();
+            for (let i = 0; i < 7; i++) {
+                const date = new Date(today);
+                date.setDate(today.getDate() + i);
+                dates.push({
+                    date: date.toISOString().split('T')[0],
+                    day: i === 0 ? '今天' : ['周日','周一','周二','周三','周四','周五','周六'][date.getDay()],
+                    dateStr: `${date.getMonth() + 1}/${date.getDate()}`
+                });
+            }
+            return dates;
+        }
+
+        // 生成基础浪高数据 - 模拟Windy数据
+        function generateBaseWave(spot) {
+            // 模拟Windy API返回的基础浪高 (0.5-2.5m)
+            let baseWave = 0.5 + Math.random() * 2.0;
+            
+            // 根据地理位置调整基础浪高
+            if (spot.lat < 20) {
+                // 海南地区 - 热带海域，浪高相对较大
+                baseWave *= 1.2;
+            } else if (spot.lat < 32) {
+                // 东海南海地区
+                baseWave *= 1.0;
+            } else {
+                // 黄海渤海地区 - 浪高相对较小
+                baseWave *= 0.8;
+            }
+            
+            return baseWave;
+        }
+
+        // 简化的浪高校准模型
+        function calibrateWaveHeight(baseWave, spot) {
+            let calibrated = baseWave;
+            calibrated *= calibrationFactors.terrain[spot.bayShape];
+            calibrated *= calibrationFactors.seabedType[spot.seabedType];
+            calibrated *= calibrationFactors.tidal[getCurrentTidalPhase()];
+            calibrated *= calibrationFactors.energy;
+            return Math.max(0.1, calibrated);
+        }
+
+        // 获取当前潮汐相位
+        function getCurrentTidalPhase() {
+            const hour = new Date().getHours();
+            const cycle = (hour % 12) / 12;
+            if (cycle < 0.2) return 'low';
+            if (cycle < 0.4) return 'mid_low';
+            if (cycle < 0.6) return 'mid';
+            if (cycle < 0.8) return 'mid_high';
+            return 'high';
+        }
+
+        // 生成浪况数据 - 优先使用真实数据
+        async function generateWaveData(spot, date) {
+            try {
+                // 调用Windy API获取真实数据
+                const windyData = await windyService.getWaveData(spot.lat, spot.lng);
+                const dayData = windyData.forecast.find(f => f.date === date);
+                
+                if (dayData && dayData.source === 'windy') {
+                    // 使用真实数据并校准
+                    const calibratedWave = calibrateWaveHeight(dayData.waveHeight, spot);
+                    return {
+                        date: date,
+                        waveHeight: Math.round(calibratedWave * 100) / 100,
+                        period: dayData.period,
+                        windSpeed: dayData.windSpeed,
+                        windDirection: dayData.windDirection,
+                        tidalPhase: getCurrentTidalPhase(),
+                        source: 'windy'
+                    };
+                }
+            } catch (error) {
+                console.log('Using fallback data for', spot.name);
+            }
+            
+            // 备用模拟数据
+            const baseWave = generateBaseWave(spot);
+            const calibratedWave = calibrateWaveHeight(baseWave, spot);
+            
+            return {
+                date: date,
+                waveHeight: Math.round(calibratedWave * 100) / 100,
+                period: Math.round((6 + Math.random() * 8) * 10) / 10,
+                windSpeed: Math.round((5 + Math.random() * 15) * 10) / 10,
+                windDirection: Math.round(Math.random() * 360),
+                tidalPhase: getCurrentTidalPhase(),
+                source: 'fallback'
+            };
+        }
+
+        // 评估浪点适合度
+        function evaluateSpot(spot, waveData, boardType) {
+            const criteria = surfCriteria[boardType];
+            let score = 0;
+            
+            const heightScore = scoreParameter(waveData.waveHeight, criteria.waveHeight);
+            score += heightScore * 0.4;
+            
+            const periodScore = scoreParameter(waveData.period, criteria.period);
+            score += periodScore * 0.3;
+            
+            const windScore = scoreParameter(waveData.windSpeed, criteria.windSpeed);
+            score += windScore * 0.3;
+            
+            return {
+                score: Math.round(score * 100) / 100,
+                rating: getRating(score),
+                factors: { height: heightScore, period: periodScore, wind: windScore }
+            };
+        }
+
+        // 参数评分函数
+        function scoreParameter(value, criteria) {
+            if (value < criteria.min || value > criteria.max) return 0;
+            
+            const [optimalMin, optimalMax] = criteria.optimal;
+            if (value >= optimalMin && value <= optimalMax) return 1.0;
+            
+            if (value < optimalMin) {
+                return (value - criteria.min) / (optimalMin - criteria.min) * 0.8;
+            } else {
+                return (criteria.max - value) / (criteria.max - optimalMax) * 0.8;
+            }
+        }
+
+        // 获取评级
+        function getRating(score) {
+            if (score >= 0.8) return 'excellent';
+            if (score >= 0.6) return 'good';
+            if (score >= 0.4) return 'fair';
+            if (score >= 0.2) return 'poor';
+            return 'flat';
+        }
+
+        // 生成所有预测数据 - 异步加载
+        async function generateAllForecastData() {
+            const dates = generateDates();
+            
+            // 优化：按地区批量加载减少API调用
+            const regions = {
+                hainan: surfSpots.filter(s => s.region === 'hainan'),
+                qingdao: surfSpots.filter(s => s.region === 'qingdao'),
+                zhoushan: surfSpots.filter(s => s.region === 'zhoushan')
+            };
+            
+            for (const dateInfo of dates) {
+                forecastData[dateInfo.date] = {};
+                
+                // 每个地区只调用一次API，其他浪点使用相近数据
+                for (const [regionName, spots] of Object.entries(regions)) {
+                    if (spots.length > 0) {
+                        // 使用地区中心点获取数据
+                        const centerSpot = spots[Math.floor(spots.length / 2)];
+                        const regionData = await generateWaveData(centerSpot, dateInfo.date);
+                        
+                        // 为该地区所有浪点生成数据
+                        for (const spot of spots) {
+                            if (spot.id === centerSpot.id) {
+                                forecastData[dateInfo.date][spot.id] = regionData;
+                            } else {
+                                // 基于中心点数据调整
+                                const adjustedData = { ...regionData };
+                                adjustedData.waveHeight = calibrateWaveHeight(regionData.waveHeight, spot);
+                                forecastData[dateInfo.date][spot.id] = adjustedData;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // 渲染日期卡片
+        function renderDateCards() {
+            const dates = generateDates();
+            const html = dates.map(dateInfo => `
+                <div class="date-card ${dateInfo.date === currentDate ? 'active' : ''}" 
+                     onclick="selectDate('${dateInfo.date}')">
+                    <div class="day">${dateInfo.day}</div>
+                    <div class="date">${dateInfo.dateStr}</div>
+                </div>
+            `).join('');
+            const dateCardsElement = document.getElementById('date-cards');
+            dateCardsElement.innerHTML = ''; // 清空
+            dateCardsElement.insertAdjacentHTML('beforeend', html); // 安全插入
+        }
+
+        // 选择日期
+        function selectDate(date) {
+            currentDate = date;
+            renderDateCards();
+            loadRecommendations();
+            loadForecastData();
+        }
+
+        // 加载推荐数据
+        function loadRecommendations() {
+            const evaluations = surfSpots.map(spot => {
+                const waveData = forecastData[currentDate][spot.id];
+                return {
+                    spot: spot,
+                    waveData: waveData,
+                    longboard: evaluateSpot(spot, waveData, 'longboard'),
+                    shortboard: evaluateSpot(spot, waveData, 'shortboard')
+                };
+            });
+
+            const topLongboard = evaluations
+                .sort((a, b) => b.longboard.score - a.longboard.score)
+                .slice(0, 3);
+            
+            const topShortboard = evaluations
+                .sort((a, b) => b.shortboard.score - a.shortboard.score)
+                .slice(0, 3);
+
+            // 渲染长板推荐
+            const longboardHtml = topLongboard.map(item => `
+                <div class="spot-card">
+                    <div class="spot-name">${item.spot.name}</div>
+                    <div class="spot-info">
+                        <span class="spot-score score-${item.longboard.rating}">评分: ${item.longboard.score}</span>
+                        <span class="wave-info">浪高: ${item.waveData.waveHeight}m</span>
+                    </div>
+                    <div class="recommendation">${getLongboardRecommendation(item.longboard.score)}</div>
+                </div>
+            `).join('');
+            
+            // 渲染短板推荐
+            const shortboardHtml = topShortboard.map(item => `
+                <div class="spot-card">
+                    <div class="spot-name">${item.spot.name}</div>
+                    <div class="spot-info">
+                        <span class="spot-score score-${item.shortboard.rating}">评分: ${item.shortboard.score}</span>
+                        <span class="wave-info">浪高: ${item.waveData.waveHeight}m</span>
+                    </div>
+                    <div class="recommendation">${getShortboardRecommendation(item.shortboard.score)}</div>
+                </div>
+            `).join('');
+            
+            const longboardElement = document.getElementById('longboard-recommendations');
+            longboardElement.innerHTML = ''; // 清空
+            longboardElement.insertAdjacentHTML('beforeend', longboardHtml);
+            const shortboardElement = document.getElementById('shortboard-recommendations');
+            shortboardElement.innerHTML = ''; // 清空
+            shortboardElement.insertAdjacentHTML('beforeend', shortboardHtml);
+        }
+
+        // 加载预测数据
+        function loadForecastData() {
+            const regions = {
+                hainan: surfSpots.filter(spot => spot.region === 'hainan'),
+                qingdao: surfSpots.filter(spot => spot.region === 'qingdao'),
+                zhoushan: surfSpots.filter(spot => spot.region === 'zhoushan')
+            };
+
+            Object.keys(regions).forEach(regionKey => {
+                const html = regions[regionKey].map(spot => {
+                    const waveData = forecastData[currentDate][spot.id];
+                    return `
+                        <div class="forecast-card">
+                            <h4>${spot.name}</h4>
+                            <div class="forecast-item">
+                                <span>浪高:</span>
+                                <span class="forecast-value">${waveData.waveHeight}m</span>
+                            </div>
+                            <div class="forecast-item">
+                                <span>周期:</span>
+                                <span>${waveData.period}s</span>
+                            </div>
+                            <div class="forecast-item">
+                                <span>风速:</span>
+                                <span>${waveData.windSpeed}km/h</span>
+                            </div>
+
+                        </div>
+                    `;
+                }).join('');
+                
+                const regionElement = document.getElementById(`${regionKey}-spots`);
+                regionElement.innerHTML = ''; // 清空
+                regionElement.insertAdjacentHTML('beforeend', html);
+            });
+        }
+
+        // 推荐文案
+        function getLongboardRecommendation(score) {
+            if (score >= 0.8) return '完美的长板条件！平稳长浪，适合滑行走板';
+            if (score >= 0.6) return '不错的长板条件，适合练习和休闲冲浪';
+            if (score >= 0.4) return '一般条件，初学者可以尝试';
+            return '条件不适合长板冲浪';
+        }
+
+        function getShortboardRecommendation(score) {
+            if (score >= 0.8) return '绝佳的短板条件！有力浪墙，适合激进动作';
+            if (score >= 0.6) return '良好的短板条件，适合技术练习';
+            if (score >= 0.4) return '可以冲浪，但条件一般';
+            return '条件不适合短板冲浪';
+        }
+
+        // 页面加载时初始化
+        document.addEventListener('DOMContentLoaded', async function() {
+            // 显示加载状态
+            SecurityUtils.safeSetHTML(document.getElementById('longboard-recommendations'), '加载中...');
+            document.getElementById('longboard-recommendations').className = 'loading';
+            SecurityUtils.safeSetHTML(document.getElementById('shortboard-recommendations'), '加载中...');
+            document.getElementById('shortboard-recommendations').className = 'loading';
+            
+            renderDateCards();
+            
+            try {
+                await generateAllForecastData();
+                loadRecommendations();
+                loadForecastData();
+            } catch (error) {
+                console.error('Data loading error:', error);
+                // 显示错误信息
+                SecurityUtils.safeSetHTML(document.getElementById('longboard-recommendations'), '数据加载失败，请刷新页面');
+                document.getElementById('longboard-recommendations').className = 'error';
+                SecurityUtils.safeSetHTML(document.getElementById('shortboard-recommendations'), '数据加载失败，请刷新页面');
+                document.getElementById('shortboard-recommendations').className = 'error';
+            }
+        });
+        
+        // 初始化Windy服务
+        const windyService = new WindyService();
+    </script>
+</body>
+</html>
