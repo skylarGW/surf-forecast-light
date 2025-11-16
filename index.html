@@ -510,7 +510,10 @@
                                 <span>风速:</span>
                                 <span>${waveData.windSpeed}km/h</span>
                             </div>
-
+                            <div class="forecast-item">
+                                <span>数据源:</span>
+                                <span class="${waveData.source === 'windy' ? 'forecast-value' : ''}">${waveData.source === 'windy' ? '实时' : '模拟'}</span>
+                            </div>
                         </div>
                     `;
                 }).join('');
@@ -559,9 +562,6 @@
                 document.getElementById('shortboard-recommendations').className = 'error';
             }
         });
-        
-        // 初始化Windy服务
-        const windyService = new WindyService();
     </script>
 </body>
 </html>
