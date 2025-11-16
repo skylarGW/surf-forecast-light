@@ -273,7 +273,7 @@
             calibrated *= calibrationFactors.seabedType[spot.seabedType];
             calibrated *= calibrationFactors.tidal[getCurrentTidalPhase()];
             calibrated *= calibrationFactors.energy;
-            return Math.max(0.1, calibrated);
+            return Math.round(Math.max(0.3, calibrated) * 100) / 100;
         }
 
         // 获取当前潮汐相位
@@ -316,7 +316,7 @@
             
             return {
                 date: date,
-                waveHeight: Math.round(calibratedWave * 100) / 100,
+                waveHeight: calibratedWave,
                 windSpeed: Math.round((5 + Math.random() * 15) * 10) / 10,
                 windDirection: Math.round(Math.random() * 360),
                 tidalPhase: getCurrentTidalPhase(),

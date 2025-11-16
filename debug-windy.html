@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Windy API 调试</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .result { background: #f5f5f5; padding: 15px; margin: 10px 0; border-radius: 4px; }
+        .error { background: #ffe6e6; color: #d00; }
+        .success { background: #e6ffe6; color: #080; }
+        button { padding: 10px 20px; margin: 5px; cursor: pointer; }
+        pre { white-space: pre-wrap; word-wrap: break-word; max-height: 400px; overflow-y: auto; }
+    </style>
+</head>
+<body>
+    <h1>🔧 Windy API 调试</h1>
+    
+    <button onclick="testWindyAPI()">测试 Windy API</button>
+    <div id="result" class="result"></div>
+
+    <script>
+        async function testWindyAPI() {
+            try {
+                console.log('开始测试 Windy API...');
+                
+                const response = await fetch('/api/windy-proxy', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        lat: 18.527192,
+                        lng: 110.107462
+                    })
+                });
+                
+                console.log('响应状态:', response.status);
+                
+                const data = await response.json();
+                console.log('响应数据:', data);
+                
+                let message = `=== Windy API 测试结果 ===\n\n`;
+                message += `响应状态: ${response.status}\n`;
+                message += `数据源: ${data.forecast?.[0]?.source || '未知'}\n`;
+                message += `预测点数: ${data.forecast?.length || 0}\n\n`;
+                
+                if (data.forecast && data.forecast.length > 0) {
+                    message += `=== 第一个预测点数据 ===\n`;
+                    message += JSON.stringify(data.forecast[0], null, 2) + '\n\n';
+                }
+                
+                message += `=== 完整响应 ===\n`;
+                message += JSON.stringify(data, null, 2);
+                
+                document.getElementById('result').innerHTML = `<pre>${message}</pre>`;
+                document.getElementById('result').className = 'result success';
+                
+            } catch (error) {
+                console.error('测试出错:', error);
+                const message = `测试出错:\n${error.message}\n${error.stack}`;
+                document.getElementById('result').innerHTML = `<pre>${message}</pre>`;
+                document.getElementById('result').className = 'result error';
+            }
+        }
+
+        // 页面加载时自动测试
+        window.addEventListener('load', () => {
+            testWindyAPI();
+        });
+    </script>
+</body>
+</html>
