@@ -356,39 +356,16 @@
             return 'flat';
         }
 
-        // 生成所有预测数据 - 异步加载
+        // 生成所有预测数据 - 为每个浪点单独调用API
         async function generateAllForecastData() {
             const dates = generateDates();
-            
-            // 优化：按地区批量加载减少API调用
-            const regions = {
-                hainan: surfSpots.filter(s => s.region === 'hainan'),
-                qingdao: surfSpots.filter(s => s.region === 'qingdao'),
-                zhoushan: surfSpots.filter(s => s.region === 'zhoushan')
-            };
             
             for (const dateInfo of dates) {
                 forecastData[dateInfo.date] = {};
                 
-                // 每个地区只调用一次API，其他浪点使用相近数据
-                for (const [regionName, spots] of Object.entries(regions)) {
-                    if (spots.length > 0) {
-                        // 使用地区中心点获取数据
-                        const centerSpot = spots[Math.floor(spots.length / 2)];
-                        const regionData = await generateWaveData(centerSpot, dateInfo.date);
-                        
-                        // 为该地区所有浪点生成数据
-                        for (const spot of spots) {
-                            if (spot.id === centerSpot.id) {
-                                forecastData[dateInfo.date][spot.id] = regionData;
-                            } else {
-                                // 基于中心点数据调整
-                                const adjustedData = { ...regionData };
-                                adjustedData.waveHeight = calibrateWaveHeight(regionData.waveHeight, spot);
-                                forecastData[dateInfo.date][spot.id] = adjustedData;
-                            }
-                        }
-                    }
+                // 为每个浪点单独获取数据
+                for (const spot of surfSpots) {
+                    forecastData[dateInfo.date][spot.id] = await generateWaveData(spot, dateInfo.date);
                 }
             }
         }
