@@ -76,7 +76,7 @@ export default async function handler(req, res) {
       lat: roundedLat,
       lon: roundedLng,
       model: 'gfsWave',
-      parameters: ['waves', 'period'],
+      parameters: ['waves', 'windWaves', 'swell1'],
       levels: ['surface'],
       key: apiKey
     };
@@ -137,26 +137,30 @@ function processWindyDataSimple(data) {
   const forecast = [];
   const timestamps = data.ts;
   const waves = data['waves-surface'];
-  const period = data['period-surface'];
+  const windWaves = data['windWaves-surface'];
+  const swell1 = data['swell1-surface'];
 
   // 使用真实海浪数据，模拟风力数据
   for (let i = 0; i < Math.min(timestamps.length, 56); i += 8) {
     const timestamp = timestamps[i];
-    const waveHeight = waves[i] || 1.0;
-    const wavePeriod = period[i] || 8.0;
+    const totalWaveHeight = waves[i] || 1.0;
+    const windWaveHeight = windWaves[i] || 0.5;
+    const swellHeight = swell1[i] || 0.5;
     
-    // 基于海浪数据模拟风力数据
-    const simulatedWindSpeed = Math.max(5, waveHeight * 8 + Math.random() * 5);
+    // 基于海浪数据模拟风力
+    const simulatedWindSpeed = Math.max(5, windWaveHeight * 12 + Math.random() * 5);
     const simulatedWindDir = Math.floor(Math.random() * 360);
     
     forecast.push({
       timestamp: timestamp,
-      waveHeight: Math.round(waveHeight * 100) / 100,
+      waveHeight: Math.round(totalWaveHeight * 100) / 100,
       windSpeed: Math.round(simulatedWindSpeed * 10) / 10,
       windDirection: simulatedWindDir,
-      period: Math.round(wavePeriod * 10) / 10,
       date: new Date(timestamp * 1000).toISOString().split('T')[0],
-      source: 'windy'
+      source: 'windy',
+      // 额外信息用于调试
+      windWaves: Math.round(windWaveHeight * 100) / 100,
+      swell: Math.round(swellHeight * 100) / 100
     });
   }
 
@@ -180,7 +184,6 @@ function generateFallbackData(lat, lng) {
       waveHeight: Math.round(baseWave * 100) / 100,
       windSpeed: Math.round((5 + Math.random() * 15) * 10) / 10,
       windDirection: Math.round(Math.random() * 360),
-      period: Math.round((6 + Math.random() * 8) * 10) / 10,
       date: new Date(timestamp).toISOString().split('T')[0],
       source: 'fallback'
     });

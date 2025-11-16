@@ -215,16 +215,14 @@
             energy: 0.9
         };
 
-        // 长板和短板评估标准
+        // 长板和短板评估标准（移除周期参数）
         const surfCriteria = {
             longboard: {
                 waveHeight: { min: 0.3, max: 1.5, optimal: [0.5, 1.0] },
-                period: { min: 8, max: 20, optimal: [10, 16] },
                 windSpeed: { min: 0, max: 15, optimal: [0, 8] }
             },
             shortboard: {
                 waveHeight: { min: 0.8, max: 3.0, optimal: [1.2, 2.5] },
-                period: { min: 6, max: 16, optimal: [8, 14] },
                 windSpeed: { min: 0, max: 25, optimal: [5, 15] }
             }
         };
@@ -302,7 +300,6 @@
                     return {
                         date: date,
                         waveHeight: Math.round(calibratedWave * 100) / 100,
-                        period: dayData.period,
                         windSpeed: dayData.windSpeed,
                         windDirection: dayData.windDirection,
                         tidalPhase: getCurrentTidalPhase(),
@@ -320,7 +317,6 @@
             return {
                 date: date,
                 waveHeight: Math.round(calibratedWave * 100) / 100,
-                period: Math.round((6 + Math.random() * 8) * 10) / 10,
                 windSpeed: Math.round((5 + Math.random() * 15) * 10) / 10,
                 windDirection: Math.round(Math.random() * 360),
                 tidalPhase: getCurrentTidalPhase(),
@@ -328,24 +324,21 @@
             };
         }
 
-        // 评估浪点适合度
+        // 评估浪点适合度（移除周期参数，调整权重）
         function evaluateSpot(spot, waveData, boardType) {
             const criteria = surfCriteria[boardType];
             let score = 0;
             
             const heightScore = scoreParameter(waveData.waveHeight, criteria.waveHeight);
-            score += heightScore * 0.4;
-            
-            const periodScore = scoreParameter(waveData.period, criteria.period);
-            score += periodScore * 0.3;
+            score += heightScore * 0.5; // 浪高权重提升刷50%
             
             const windScore = scoreParameter(waveData.windSpeed, criteria.windSpeed);
-            score += windScore * 0.3;
+            score += windScore * 0.5; // 风速权重提升刷50%
             
             return {
                 score: Math.round(score * 100) / 100,
                 rating: getRating(score),
-                factors: { height: heightScore, period: periodScore, wind: windScore }
+                factors: { height: heightScore, wind: windScore }
             };
         }
 
@@ -501,10 +494,6 @@
                             <div class="forecast-item">
                                 <span>浪高:</span>
                                 <span class="forecast-value">${waveData.waveHeight}m</span>
-                            </div>
-                            <div class="forecast-item">
-                                <span>周期:</span>
-                                <span>${waveData.period}s</span>
                             </div>
                             <div class="forecast-item">
                                 <span>风速:</span>

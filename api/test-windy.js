@@ -38,7 +38,7 @@ export default async function handler(req, res) {
       lat: testLat,
       lon: testLng,
       model: 'gfsWave',
-      parameters: ['waves', 'period'],
+      parameters: ['waves', 'windWaves', 'swell1'],
       levels: ['surface'],
       key: apiKey
     };
