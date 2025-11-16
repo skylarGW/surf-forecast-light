@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>浪高分量数据测试</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background: #f5f5f5; }
+        .container { max-width: 800px; margin: 0 auto; }
+        .test-card { 
+            background: white; 
+            border-radius: 8px; 
+            padding: 20px; 
+            margin: 20px 0; 
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        .data-item { 
+            display: flex; 
+            justify-content: space-between; 
+            padding: 8px 0; 
+            border-bottom: 1px solid #eee;
+        }
+        .data-item:last-child { border-bottom: none; }
+        .value { font-weight: bold; color: #007bff; }
+        .source-windy { color: #28a745; }
+        .source-fallback { color: #ffc107; }
+        button { 
+            background: #007bff; 
+            color: white; 
+            border: none; 
+            padding: 10px 20px; 
+            border-radius: 5px; 
+            cursor: pointer; 
+            margin: 10px 5px;
+        }
+        button:hover { background: #0056b3; }
+        .loading { text-align: center; color: #666; }
+        .error { color: #dc3545; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🌊 浪高分量数据测试</h1>
+        <p>测试API调用返回的总浪高、风浪分量、涌浪分量和时间戳数据</p>
+        
+        <div>
+            <button onclick="testHainanSpot()">测试海南浪点</button>
+            <button onclick="testQingdaoSpot()">测试青岛浪点</button>
+            <button onclick="testZhoushanSpot()">测试舟山浪点</button>
+            <button onclick="clearResults()">清空结果</button>
+        </div>
+        
+        <div id="results"></div>
+    </div>
+
+    <script src="js/windy-service.js"></script>
+    <script>
+        // 测试浪点坐标
+        const testSpots = {
+            hainan: { name: "海南-陵水万豪", lat: 18.527192, lng: 110.107462 },
+            qingdao: { name: "青岛-石老人", lat: 36.088937, lng: 120.46526 },
+            zhoushan: { name: "舟山-东沙", lat: 30.0444, lng: 122.1067 }
+        };
+
+        async function testSpot(spotKey) {
+            const spot = testSpots[spotKey];
+            const resultsDiv = document.getElementById('results');
+            
+            // 添加加载状态
+            const loadingCard = document.createElement('div');
+            loadingCard.className = 'test-card';
+            loadingCard.innerHTML = `
+                <h3>${spot.name}</h3>
+                <div class="loading">正在获取数据...</div>
+            `;
+            resultsDiv.appendChild(loadingCard);
+
+            try {
+                console.log(`Testing ${spot.name} at coordinates:`, spot.lat, spot.lng);
+                
+                const data = await windyService.getWaveData(spot.lat, spot.lng);
+                console.log(`Data received for ${spot.name}:`, data);
+                
+                // 移除加载状态
+                resultsDiv.removeChild(loadingCard);
+                
+                // 显示结果
+                const resultCard = document.createElement('div');
+                resultCard.className = 'test-card';
+                
+                let html = `<h3>${spot.name} (${spot.lat}, ${spot.lng})</h3>`;
+                
+                if (data && data.forecast && data.forecast.length > 0) {
+                    html += `<p>获取到 ${data.forecast.length} 个预测点</p>`;
+                    
+                    // 显示前3个预测点的详细数据
+                    data.forecast.slice(0, 3).forEach((forecast, index) => {
+                        const sourceClass = forecast.source === 'windy' ? 'source-windy' : 'source-fallback';
+                        html += `
+                            <div style="margin: 15px 0; padding: 15px; border: 1px solid #ddd; border-radius: 5px;">
+                                <h4>预测点 ${index + 1} - ${forecast.date} ${forecast.time || ''}</h4>
+                                <div class="data-item">
+                                    <span>总浪高 (waves_height-surface):</span>
+                                    <span class="value">${forecast.totalWaveHeight || forecast.waveHeight}m</span>
+                                </div>
+                                <div class="data-item">
+                                    <span>风浪分量 (wwaves_height-surface):</span>
+                                    <span class="value">${forecast.windWaveHeight || 'N/A'}m</span>
+                                </div>
+                                <div class="data-item">
+                                    <span>涌浪分量 (swell1_height-surface):</span>
+                                    <span class="value">${forecast.swellHeight || 'N/A'}m</span>
+                                </div>
+                                <div class="data-item">
+                                    <span>时间戳 (ts):</span>
+                                    <span class="value">${forecast.timestamp}</span>
+                                </div>
+                                <div class="data-item">
+                                    <span>数据源:</span>
+                                    <span class="value ${sourceClass}">${forecast.source === 'windy' ? 'Windy API (实时)' : '模拟数据'}</span>
+                                </div>
+                            </div>
+                        `;
+                    });
+                } else {
+                    html += '<div class="error">未获取到预测数据</div>';
+                }
+                
+                resultCard.innerHTML = html;
+                resultsDiv.appendChild(resultCard);
+                
+            } catch (error) {
+                console.error(`Error testing ${spot.name}:`, error);
+                
+                // 移除加载状态
+                if (resultsDiv.contains(loadingCard)) {
+                    resultsDiv.removeChild(loadingCard);
+                }
+                
+                // 显示错误
+                const errorCard = document.createElement('div');
+                errorCard.className = 'test-card';
+                errorCard.innerHTML = `
+                    <h3>${spot.name}</h3>
+                    <div class="error">错误: ${error.message}</div>
+                `;
+                resultsDiv.appendChild(errorCard);
+            }
+        }
+
+        function testHainanSpot() {
+            testSpot('hainan');
+        }
+
+        function testQingdaoSpot() {
+            testSpot('qingdao');
+        }
+
+        function testZhoushanSpot() {
+            testSpot('zhoushan');
+        }
+
+        function clearResults() {
+            document.getElementById('results').innerHTML = '';
+        }
+
+        // 页面加载时显示说明
+        document.addEventListener('DOMContentLoaded', function() {
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.innerHTML = `
+                <div class="test-card">
+                    <h3>测试说明</h3>
+                    <p>此页面用于测试API调用是否正确返回以下4个关键数值：</p>
+                    <ul>
+                        <li><strong>总浪高</strong> (waves_height-surface) - 海面总体浪高</li>
+                        <li><strong>风浪分量</strong> (wwaves_height-surface) - 由风力产生的浪高</li>
+                        <li><strong>涌浪分量</strong> (swell1_height-surface) - 远程传播的涌浪高度</li>
+                        <li><strong>时间戳</strong> (ts) - 预测时间点</li>
+                    </ul>
+                    <p>点击上方按钮测试不同地区的浪点数据。</p>
+                </div>
+            `;
+        });
+    </script>
+</body>
+</html>

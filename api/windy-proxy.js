@@ -112,9 +112,9 @@ export default async function handler(req, res) {
     console.log('Windy API data received:', Object.keys(data));
     console.log('Raw Windy data sample:', {
       ts: data.ts ? data.ts.slice(0, 3) : 'missing',
-      'waves-surface': data['waves-surface'] ? data['waves-surface'].slice(0, 3) : 'missing',
-      'windWaves-surface': data['windWaves-surface'] ? data['windWaves-surface'].slice(0, 3) : 'missing',
-      'swell1-surface': data['swell1-surface'] ? data['swell1-surface'].slice(0, 3) : 'missing'
+      'waves_height-surface': data['waves_height-surface'] ? data['waves_height-surface'].slice(0, 3) : 'missing',
+      'wwaves_height-surface': data['wwaves_height-surface'] ? data['wwaves_height-surface'].slice(0, 3) : 'missing',
+      'swell1_height-surface': data['swell1_height-surface'] ? data['swell1_height-surface'].slice(0, 3) : 'missing'
     });
     
     const processedData = processWindyDataSimple(data);
@@ -145,9 +145,10 @@ function processWindyDataSimple(data) {
   console.log('Processing Windy data...');
   const forecast = [];
   const timestamps = data.ts;
-  const waves = data['waves-surface'];
-  const windWaves = data['windWaves-surface'];
-  const swell1 = data['swell1-surface'];
+  // 使用正确的Windy API字段名
+  const waves = data['waves_height-surface'];
+  const windWaves = data['wwaves_height-surface'];
+  const swell1 = data['swell1_height-surface'];
 
   console.log('Data arrays check:', {
     timestamps: timestamps ? timestamps.length : 'missing',
@@ -161,9 +162,9 @@ function processWindyDataSimple(data) {
     throw new Error('Invalid Windy API response: missing timestamps or waves data');
   }
 
-  // 使用真实海浪数据，模拟风力数据
+  // 处理每3小时的数据点，生成7天预测
   for (let i = 0; i < Math.min(timestamps.length, 56); i += 8) {
-    const timestamp = timestamps[i];
+    const timestamp = timestamps[i] / 1000; // Windy返回毫秒，转换为秒
     const totalWaveHeight = waves[i] || 1.0;
     const windWaveHeight = windWaves[i] || 0.5;
     const swellHeight = swell1[i] || 0.5;
@@ -174,14 +175,17 @@ function processWindyDataSimple(data) {
     
     forecast.push({
       timestamp: timestamp,
+      // 主要浪高数据
+      totalWaveHeight: Math.round(totalWaveHeight * 100) / 100,
+      windWaveHeight: Math.round(windWaveHeight * 100) / 100,
+      swellHeight: Math.round(swellHeight * 100) / 100,
+      // 兼容旧字段
       waveHeight: Math.round(totalWaveHeight * 100) / 100,
       windSpeed: Math.round(simulatedWindSpeed * 10) / 10,
       windDirection: simulatedWindDir,
       date: new Date(timestamp * 1000).toISOString().split('T')[0],
-      source: 'windy',
-      // 额外信息用于调试
-      windWaves: Math.round(windWaveHeight * 100) / 100,
-      swell: Math.round(swellHeight * 100) / 100
+      time: new Date(timestamp * 1000).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }),
+      source: 'windy'
     });
   }
 
@@ -200,12 +204,22 @@ function generateFallbackData(lat, lng) {
     else if (lat < 32) baseWave *= 1.0;
     else baseWave *= 0.8;
     
+    // 模拟风浪和涌浪分量
+    const windWaveComponent = baseWave * (0.3 + Math.random() * 0.4); // 30-70%
+    const swellComponent = baseWave * (0.2 + Math.random() * 0.5); // 20-70%
+    
     forecast.push({
       timestamp: Math.floor(timestamp / 1000),
+      // 主要浪高数据
+      totalWaveHeight: Math.round(baseWave * 100) / 100,
+      windWaveHeight: Math.round(windWaveComponent * 100) / 100,
+      swellHeight: Math.round(swellComponent * 100) / 100,
+      // 兼容旧字段
       waveHeight: Math.round(baseWave * 100) / 100,
       windSpeed: Math.round((5 + Math.random() * 15) * 10) / 10,
       windDirection: Math.round(Math.random() * 360),
       date: new Date(timestamp).toISOString().split('T')[0],
+      time: new Date(timestamp).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }),
       source: 'fallback'
     });
   }

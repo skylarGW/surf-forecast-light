@@ -215,15 +215,13 @@
             energy: 0.9
         };
 
-        // 长板和短板评估标准（移除周期参数）
+        // 长板和短板评估标准（纯浪高评估）
         const surfCriteria = {
             longboard: {
-                waveHeight: { min: 0.3, max: 1.5, optimal: [0.5, 1.0] },
-                windSpeed: { min: 0, max: 15, optimal: [0, 8] }
+                waveHeight: { min: 0.3, max: 1.5, optimal: [0.5, 1.0] }
             },
             shortboard: {
-                waveHeight: { min: 0.8, max: 3.0, optimal: [1.2, 2.5] },
-                windSpeed: { min: 0, max: 25, optimal: [5, 15] }
+                waveHeight: { min: 0.8, max: 3.0, optimal: [1.2, 2.5] }
             }
         };
 
@@ -296,12 +294,17 @@
                 
                 if (dayData && dayData.source === 'windy') {
                     // 使用真实数据并校准
-                    const calibratedWave = calibrateWaveHeight(dayData.waveHeight, spot);
+                    const calibratedTotal = calibrateWaveHeight(dayData.totalWaveHeight || dayData.waveHeight, spot);
+                    const calibratedWind = calibrateWaveHeight(dayData.windWaveHeight || dayData.totalWaveHeight * 0.5, spot);
+                    const calibratedSwell = calibrateWaveHeight(dayData.swellHeight || dayData.totalWaveHeight * 0.4, spot);
+                    
                     return {
                         date: date,
-                        waveHeight: Math.round(calibratedWave * 100) / 100,
-                        windSpeed: dayData.windSpeed,
-                        windDirection: dayData.windDirection,
+                        time: dayData.time,
+                        totalWaveHeight: Math.round(calibratedTotal * 100) / 100,
+                        windWaveHeight: Math.round(calibratedWind * 100) / 100,
+                        swellHeight: Math.round(calibratedSwell * 100) / 100,
+                        waveHeight: Math.round(calibratedTotal * 100) / 100,
                         tidalPhase: getCurrentTidalPhase(),
                         source: 'windy'
                     };
@@ -313,32 +316,33 @@
             // 备用模拟数据
             const baseWave = generateBaseWave(spot);
             const calibratedWave = calibrateWaveHeight(baseWave, spot);
+            const windComponent = calibratedWave * (0.3 + Math.random() * 0.4);
+            const swellComponent = calibratedWave * (0.2 + Math.random() * 0.5);
             
             return {
                 date: date,
+                time: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }),
+                totalWaveHeight: calibratedWave,
+                windWaveHeight: Math.round(windComponent * 100) / 100,
+                swellHeight: Math.round(swellComponent * 100) / 100,
                 waveHeight: calibratedWave,
-                windSpeed: Math.round((5 + Math.random() * 15) * 10) / 10,
-                windDirection: Math.round(Math.random() * 360),
                 tidalPhase: getCurrentTidalPhase(),
                 source: 'fallback'
             };
         }
 
-        // 评估浪点适合度（移除周期参数，调整权重）
+        // 评估浪点适合度（纯浪高评估）
         function evaluateSpot(spot, waveData, boardType) {
             const criteria = surfCriteria[boardType];
-            let score = 0;
             
-            const heightScore = scoreParameter(waveData.waveHeight, criteria.waveHeight);
-            score += heightScore * 0.5; // 浪高权重提升刷50%
-            
-            const windScore = scoreParameter(waveData.windSpeed, criteria.windSpeed);
-            score += windScore * 0.5; // 风速权重提升刷50%
+            // 使用总浪高进行评估
+            const totalHeight = waveData.totalWaveHeight || waveData.waveHeight;
+            const heightScore = scoreParameter(totalHeight, criteria.waveHeight);
             
             return {
-                score: Math.round(score * 100) / 100,
-                rating: getRating(score),
-                factors: { height: heightScore, wind: windScore }
+                score: Math.round(heightScore * 100) / 100,
+                rating: getRating(heightScore),
+                factors: { height: heightScore }
             };
         }
 
@@ -451,7 +455,11 @@
                     <div class="spot-name">${item.spot.name}</div>
                     <div class="spot-info">
                         <span class="spot-score score-${item.longboard.rating}">评分: ${item.longboard.score}</span>
-                        <span class="wave-info">浪高: ${item.waveData.waveHeight}m</span>
+                        <span class="wave-info">总浪: ${item.waveData.totalWaveHeight || item.waveData.waveHeight}m</span>
+                    </div>
+                    <div class="wave-info" style="font-size: 0.85em; color: #666; margin: 5px 0;">
+                        风浪: ${item.waveData.windWaveHeight || (item.waveData.waveHeight * 0.5).toFixed(2)}m | 
+                        涌浪: ${item.waveData.swellHeight || (item.waveData.waveHeight * 0.4).toFixed(2)}m
                     </div>
                     <div class="recommendation">${getLongboardRecommendation(item.longboard.score)}</div>
                 </div>
@@ -463,7 +471,11 @@
                     <div class="spot-name">${item.spot.name}</div>
                     <div class="spot-info">
                         <span class="spot-score score-${item.shortboard.rating}">评分: ${item.shortboard.score}</span>
-                        <span class="wave-info">浪高: ${item.waveData.waveHeight}m</span>
+                        <span class="wave-info">总浪: ${item.waveData.totalWaveHeight || item.waveData.waveHeight}m</span>
+                    </div>
+                    <div class="wave-info" style="font-size: 0.85em; color: #666; margin: 5px 0;">
+                        风浪: ${item.waveData.windWaveHeight || (item.waveData.waveHeight * 0.5).toFixed(2)}m | 
+                        涌浪: ${item.waveData.swellHeight || (item.waveData.waveHeight * 0.4).toFixed(2)}m
                     </div>
                     <div class="recommendation">${getShortboardRecommendation(item.shortboard.score)}</div>
                 </div>
@@ -492,12 +504,20 @@
                         <div class="forecast-card">
                             <h4>${spot.name}</h4>
                             <div class="forecast-item">
-                                <span>浪高:</span>
-                                <span class="forecast-value">${waveData.waveHeight}m</span>
+                                <span>总浪高:</span>
+                                <span class="forecast-value">${waveData.totalWaveHeight || waveData.waveHeight}m</span>
                             </div>
                             <div class="forecast-item">
-                                <span>风速:</span>
-                                <span>${waveData.windSpeed}km/h</span>
+                                <span>风浪分量:</span>
+                                <span class="forecast-value">${waveData.windWaveHeight || (waveData.waveHeight * 0.5).toFixed(2)}m</span>
+                            </div>
+                            <div class="forecast-item">
+                                <span>涌浪分量:</span>
+                                <span class="forecast-value">${waveData.swellHeight || (waveData.waveHeight * 0.4).toFixed(2)}m</span>
+                            </div>
+                            <div class="forecast-item">
+                                <span>时间:</span>
+                                <span>${waveData.time || '全天'}</span>
                             </div>
                             <div class="forecast-item">
                                 <span>数据源:</span>

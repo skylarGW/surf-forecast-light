@@ -99,13 +99,23 @@ class WindyService {
                 baseWave *= 0.8;
             }
             
+            // 模拟风浪和涌浪分量
+            const windWaveComponent = baseWave * (0.3 + Math.random() * 0.4); // 30-70%
+            const swellComponent = baseWave * (0.2 + Math.random() * 0.5); // 20-70%
+            
             forecast.push({
                 timestamp: Math.floor(timestamp / 1000),
+                // 主要浪高数据
+                totalWaveHeight: Math.round(baseWave * 100) / 100,
+                windWaveHeight: Math.round(windWaveComponent * 100) / 100,
+                swellHeight: Math.round(swellComponent * 100) / 100,
+                // 兼容旧字段
                 waveHeight: Math.round(baseWave * 100) / 100,
                 windSpeed: Math.round((5 + Math.random() * 15) * 10) / 10,
                 windDirection: Math.round(Math.random() * 360),
                 period: Math.round((6 + Math.random() * 8) * 10) / 10,
                 date: new Date(timestamp).toISOString().split('T')[0],
+                time: new Date(timestamp).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }),
                 source: 'fallback'
             });
         }
