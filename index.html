@@ -190,28 +190,27 @@
     <script src="js/security-utils.js"></script>
     <script src="js/windy-service.js"></script>
     <script>
-        // 13个精选浪点数据 - 简化参数
+        // 13个精选浪点数据 - 更新地形配置
         const surfSpots = [
-            { id: 1, name: "舟山-东沙冲浪公园", lat: 30.0444, lng: 122.1067, type: "beach_break", exposure: "east", bayShape: "open", seabedType: "sand", region: "zhoushan" },
-            { id: 2, name: "舟山-岱山鹿栏", lat: 30.2644, lng: 122.2067, type: "beach_break", exposure: "southeast", bayShape: "semi_enclosed", seabedType: "sand_rock", region: "zhoushan" },
+            { id: 1, name: "舟山-东沙冲浪公园", lat: 30.0444, lng: 122.1067, type: "beach_break", exposure: "east", bayShape: "enclosed", seabedType: "sand", region: "zhoushan" },
+            { id: 2, name: "舟山-岱山鹿栏", lat: 30.2644, lng: 122.2067, type: "beach_break", exposure: "southeast", bayShape: "open", seabedType: "sand_rock", region: "zhoushan" },
             { id: 3, name: "青岛-石老人海水浴场", lat: 36.088937, lng: 120.46526, type: "beach_break", exposure: "east", bayShape: "open", seabedType: "sand", region: "qingdao" },
-            { id: 4, name: "青岛-流清河海水浴场", lat: 36.05, lng: 120.3167, type: "beach_break", exposure: "southeast", bayShape: "semi_enclosed", seabedType: "sand", region: "qingdao" },
-            { id: 5, name: "青岛-黄岛两河口", lat: 35.888322, lng: 120.073882, type: "beach_break", exposure: "south", bayShape: "semi_enclosed", seabedType: "sand_rock", region: "qingdao" },
-            { id: 6, name: "海南-陵水万豪", lat: 18.527192, lng: 110.107462, type: "beach_break", exposure: "east", bayShape: "enclosed", seabedType: "sand", region: "hainan" },
-            { id: 7, name: "海南-陵水银滩", lat: 18.529086, lng: 110.108919, type: "beach_break", exposure: "east", bayShape: "enclosed", seabedType: "sand", region: "hainan" },
-            { id: 8, name: "海南-陵水香水湾", lat: 18.550802, lng: 110.131152, type: "beach_break", exposure: "southeast", bayShape: "open", seabedType: "sand", region: "hainan" },
-            { id: 9, name: "海南-万宁石梅湾大石头", lat: 18.65725, lng: 110.265098, type: "point_break", exposure: "east", bayShape: "semi_enclosed", seabedType: "rock_reef", region: "hainan" },
-            { id: 10, name: "海南-万宁石梅湾艾美", lat: 18.667275, lng: 110.286256, type: "beach_break", exposure: "east", bayShape: "enclosed", seabedType: "sand", region: "hainan" },
-            { id: 11, name: "海南-万宁南燕湾", lat: 18.663408, lng: 110.305698, type: "point_break", exposure: "east", bayShape: "enclosed", seabedType: "sand", region: "hainan" },
+            { id: 4, name: "青岛-流清河海水浴场", lat: 36.05, lng: 120.3167, type: "beach_break", exposure: "southeast", bayShape: "enclosed", seabedType: "sand", region: "qingdao" },
+            { id: 5, name: "青岛-黄岛两河口", lat: 35.888322, lng: 120.073882, type: "beach_break", exposure: "south", bayShape: "enclosed", seabedType: "sand_rock", region: "qingdao" },
+            { id: 6, name: "海南-陵水万豪", lat: 18.527192, lng: 110.107462, type: "beach_break", exposure: "east", bayShape: "open", seabedType: "sand", region: "hainan" },
+            { id: 7, name: "海南-陵水银滩", lat: 18.529086, lng: 110.108919, type: "beach_break", exposure: "east", bayShape: "open", seabedType: "sand", region: "hainan" },
+            { id: 8, name: "海南-陵水香水湾", lat: 18.550802, lng: 110.131152, type: "beach_break", exposure: "southeast", bayShape: "enclosed", seabedType: "sand", region: "hainan" },
+            { id: 9, name: "海南-万宁石梅湾大石头", lat: 18.65725, lng: 110.265098, type: "point_break", exposure: "east", bayShape: "open", seabedType: "rock_reef", region: "hainan" },
+            { id: 10, name: "海南-万宁石梅湾艾美", lat: 18.667275, lng: 110.286256, type: "beach_break", exposure: "east", bayShape: "open", seabedType: "sand", region: "hainan" },
+            { id: 11, name: "海南-万宁南燕湾", lat: 18.663408, lng: 110.305698, type: "point_break", exposure: "east", bayShape: "open", seabedType: "sand", region: "hainan" },
             { id: 12, name: "海南-万宁新潭湾", lat: 18.731155, lng: 110.445003, type: "beach_break", exposure: "southeast", bayShape: "open", seabedType: "sand_reef", region: "hainan" },
-            { id: 13, name: "海南-万宁高尔夫", lat: 18.659592, lng: 110.317269, type: "point_break", exposure: "east", bayShape: "enclosed", seabedType: "sand", region: "hainan" }
+            { id: 13, name: "海南-万宁高尔夫", lat: 18.659592, lng: 110.317269, type: "point_break", exposure: "east", bayShape: "open", seabedType: "sand", region: "hainan" }
         ];
 
         // 简化的校准参数
         const calibrationFactors = {
-            terrain: { open: 0.85, semi_enclosed: 0.65, enclosed: 0.4 },
+            terrain: { open: 0.9, enclosed: 0.4 },
             seabedType: { sand: 0.7, sand_rock: 0.75, rock: 0.85, reef: 0.9, rock_reef: 0.8, sand_reef: 0.75 },
-            tidal: { low: 0.6, mid_low: 0.75, mid: 0.85, mid_high: 0.9, high: 0.8 },
             energy: 0.9
         };
 
@@ -269,21 +268,11 @@
             let calibrated = baseWave;
             calibrated *= calibrationFactors.terrain[spot.bayShape];
             calibrated *= calibrationFactors.seabedType[spot.seabedType];
-            calibrated *= calibrationFactors.tidal[getCurrentTidalPhase()];
             calibrated *= calibrationFactors.energy;
             return Math.round(Math.max(0.3, calibrated) * 100) / 100;
         }
 
-        // 获取当前潮汐相位
-        function getCurrentTidalPhase() {
-            const hour = new Date().getHours();
-            const cycle = (hour % 12) / 12;
-            if (cycle < 0.2) return 'low';
-            if (cycle < 0.4) return 'mid_low';
-            if (cycle < 0.6) return 'mid';
-            if (cycle < 0.8) return 'mid_high';
-            return 'high';
-        }
+
 
         // 生成浪况数据 - 优先使用真实数据
         async function generateWaveData(spot, date) {
@@ -305,7 +294,6 @@
                         windWaveHeight: Math.round(calibratedWind * 100) / 100,
                         swellHeight: Math.round(calibratedSwell * 100) / 100,
                         waveHeight: Math.round(calibratedTotal * 100) / 100,
-                        tidalPhase: getCurrentTidalPhase(),
                         source: 'windy'
                     };
                 }
@@ -326,7 +314,6 @@
                 windWaveHeight: Math.round(windComponent * 100) / 100,
                 swellHeight: Math.round(swellComponent * 100) / 100,
                 waveHeight: calibratedWave,
-                tidalPhase: getCurrentTidalPhase(),
                 source: 'fallback'
             };
         }

@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>浪高计算步骤调试工具</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background: #f5f5f5; }
+        .container { max-width: 1000px; margin: 0 auto; }
+        .debug-card { 
+            background: white; 
+            border-radius: 8px; 
+            padding: 20px; 
+            margin: 20px 0; 
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        .step { 
+            background: #f8f9fa; 
+            border-left: 4px solid #007bff; 
+            padding: 15px; 
+            margin: 10px 0; 
+        }
+        .calculation { 
+            background: #e7f3ff; 
+            padding: 10px; 
+            border-radius: 5px; 
+            font-family: monospace; 
+            margin: 10px 0;
+        }
+        .result { 
+            background: #d4edda; 
+            color: #155724; 
+            padding: 10px; 
+            border-radius: 5px; 
+            font-weight: bold;
+        }
+        .original { 
+            background: #fff3cd; 
+            color: #856404; 
+            padding: 10px; 
+            border-radius: 5px; 
+        }
+        button { 
+            background: #007bff; 
+            color: white; 
+            border: none; 
+            padding: 10px 20px; 
+            border-radius: 5px; 
+            cursor: pointer; 
+            margin: 10px 5px;
+        }
+        button:hover { background: #0056b3; }
+        .factor { color: #dc3545; font-weight: bold; }
+        table { width: 100%; border-collapse: collapse; margin: 10px 0; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background: #f8f9fa; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 浪高计算步骤调试工具</h1>
+        <p>详细展示从API原始数据到网站显示数据的完整计算过程</p>
+        
+        <div>
+            <button onclick="debugHainanSpot()">调试海南陵水万豪</button>
+            <button onclick="debugQingdaoSpot()">调试青岛石老人</button>
+            <button onclick="debugZhoushanSpot()">调试舟山东沙</button>
+            <button onclick="clearResults()">清空结果</button>
+        </div>
+        
+        <div id="results"></div>
+    </div>
+
+    <script src="js/windy-service.js"></script>
+    <script>
+        // 浪点配置
+        const debugSpots = {
+            hainan: { 
+                name: "海南-陵水万豪", 
+                lat: 18.527192, 
+                lng: 110.107462,
+                bayShape: "open", 
+                seabedType: "sand" 
+            },
+            qingdao: { 
+                name: "青岛-石老人", 
+                lat: 36.088937, 
+                lng: 120.46526,
+                bayShape: "open", 
+                seabedType: "sand" 
+            },
+            zhoushan: { 
+                name: "舟山-东沙", 
+                lat: 30.0444, 
+                lng: 122.1067,
+                bayShape: "enclosed", 
+                seabedType: "sand" 
+            }
+        };
+
+        // 校准参数
+        const calibrationFactors = {
+            terrain: { open: 0.9, enclosed: 0.4 },
+            seabedType: { sand: 0.7, sand_rock: 0.75, rock: 0.85, reef: 0.9, rock_reef: 0.8, sand_reef: 0.75 },
+            energy: 0.9
+        };
+
+
+
+        // 校准函数
+        function calibrateWaveHeight(baseWave, spot) {
+            const steps = [];
+            let calibrated = baseWave;
+            
+            steps.push({
+                step: "原始数据",
+                value: baseWave,
+                description: "API返回的原始浪高"
+            });
+            
+            const terrainFactor = calibrationFactors.terrain[spot.bayShape];
+            calibrated *= terrainFactor;
+            steps.push({
+                step: "地形校准",
+                factor: terrainFactor,
+                value: calibrated,
+                description: `${spot.bayShape} 地形影响`
+            });
+            
+            const seabedFactor = calibrationFactors.seabedType[spot.seabedType];
+            calibrated *= seabedFactor;
+            steps.push({
+                step: "海床校准", 
+                factor: seabedFactor,
+                value: calibrated,
+                description: `${spot.seabedType} 海床类型影响`
+            });
+            
+            const energyFactor = calibrationFactors.energy;
+            calibrated *= energyFactor;
+            steps.push({
+                step: "能量衰减",
+                factor: energyFactor,
+                value: calibrated,
+                description: "海浪能量自然衰减"
+            });
+            
+            const finalValue = Math.round(Math.max(0.3, calibrated) * 100) / 100;
+            steps.push({
+                step: "最终结果",
+                value: finalValue,
+                description: "四舍五入并设置最小值0.3m"
+            });
+            
+            return { finalValue, steps };
+        }
+
+        async function debugSpot(spotKey) {
+            const spot = debugSpots[spotKey];
+            const resultsDiv = document.getElementById('results');
+            
+            // 添加加载状态
+            const loadingCard = document.createElement('div');
+            loadingCard.className = 'debug-card';
+            loadingCard.innerHTML = `
+                <h3>${spot.name} - 计算步骤分析</h3>
+                <div>正在获取数据和计算...</div>
+            `;
+            resultsDiv.appendChild(loadingCard);
+
+            try {
+                // 获取API数据
+                const data = await windyService.getWaveData(spot.lat, spot.lng);
+                console.log('Raw API data:', data);
+                
+                // 移除加载状态
+                resultsDiv.removeChild(loadingCard);
+                
+                if (data && data.forecast && data.forecast.length > 0) {
+                    const forecast = data.forecast[0]; // 使用第一个预测点
+                    
+                    // 计算每个浪高分量的校准步骤
+                    const totalCalc = calibrateWaveHeight(forecast.totalWaveHeight || forecast.waveHeight, spot);
+                    const windCalc = calibrateWaveHeight(forecast.windWaveHeight || forecast.totalWaveHeight * 0.5, spot);
+                    const swellCalc = calibrateWaveHeight(forecast.swellHeight || forecast.totalWaveHeight * 0.4, spot);
+                    
+                    // 显示结果
+                    const resultCard = document.createElement('div');
+                    resultCard.className = 'debug-card';
+                    
+                    let html = `
+                        <h3>${spot.name} - 详细计算步骤</h3>
+                        
+                        <div class="step">
+                            <h4>浪点配置信息</h4>
+                            <table>
+                                <tr><th>参数</th><th>值</th><th>校准因子</th></tr>
+                                <tr><td>地形类型</td><td>${spot.bayShape}</td><td class="factor">${calibrationFactors.terrain[spot.bayShape]}</td></tr>
+                                <tr><td>海床类型</td><td>${spot.seabedType}</td><td class="factor">${calibrationFactors.seabedType[spot.seabedType]}</td></tr>
+                                <tr><td>能量衰减</td><td>固定值</td><td class="factor">${calibrationFactors.energy}</td></tr>
+                            </table>
+                        </div>
+
+                        <div class="step">
+                            <h4>API原始数据</h4>
+                            <div class="original">
+                                总浪高: ${forecast.totalWaveHeight || forecast.waveHeight}m<br>
+                                风浪分量: ${forecast.windWaveHeight || 'N/A'}m<br>
+                                涌浪分量: ${forecast.swellHeight || 'N/A'}m<br>
+                                数据源: ${forecast.source}
+                            </div>
+                        </div>
+                    `;
+                    
+                    // 总浪高计算步骤
+                    html += `
+                        <div class="step">
+                            <h4>🌊 总浪高计算步骤</h4>
+                            ${totalCalc.steps.map((step, index) => `
+                                <div class="calculation">
+                                    ${index + 1}. ${step.step}: 
+                                    ${step.factor ? `${step.value.toFixed(4)}m (×${step.factor})` : `${step.value.toFixed(4)}m`}
+                                    <br><small>${step.description}</small>
+                                </div>
+                            `).join('')}
+                            <div class="result">最终总浪高: ${totalCalc.finalValue}m</div>
+                        </div>
+                    `;
+                    
+                    // 风浪分量计算步骤
+                    html += `
+                        <div class="step">
+                            <h4>💨 风浪分量计算步骤</h4>
+                            ${windCalc.steps.map((step, index) => `
+                                <div class="calculation">
+                                    ${index + 1}. ${step.step}: 
+                                    ${step.factor ? `${step.value.toFixed(4)}m (×${step.factor})` : `${step.value.toFixed(4)}m`}
+                                    <br><small>${step.description}</small>
+                                </div>
+                            `).join('')}
+                            <div class="result">最终风浪分量: ${windCalc.finalValue}m</div>
+                        </div>
+                    `;
+                    
+                    // 涌浪分量计算步骤
+                    html += `
+                        <div class="step">
+                            <h4>🌀 涌浪分量计算步骤</h4>
+                            ${swellCalc.steps.map((step, index) => `
+                                <div class="calculation">
+                                    ${index + 1}. ${step.step}: 
+                                    ${step.factor ? `${step.value.toFixed(4)}m (×${step.factor})` : `${step.value.toFixed(4)}m`}
+                                    <br><small>${step.description}</small>
+                                </div>
+                            `).join('')}
+                            <div class="result">最终涌浪分量: ${swellCalc.finalValue}m</div>
+                        </div>
+                    `;
+                    
+                    // 总结对比
+                    const totalReduction = ((forecast.totalWaveHeight - totalCalc.finalValue) / forecast.totalWaveHeight * 100).toFixed(1);
+                    html += `
+                        <div class="step">
+                            <h4>📊 数据对比总结</h4>
+                            <table>
+                                <tr><th>数据类型</th><th>API原始值</th><th>网站显示值</th><th>降幅</th></tr>
+                                <tr>
+                                    <td>总浪高</td>
+                                    <td>${forecast.totalWaveHeight || forecast.waveHeight}m</td>
+                                    <td>${totalCalc.finalValue}m</td>
+                                    <td class="factor">${totalReduction}%</td>
+                                </tr>
+                                <tr>
+                                    <td>风浪分量</td>
+                                    <td>${forecast.windWaveHeight || (forecast.totalWaveHeight * 0.5).toFixed(2)}m</td>
+                                    <td>${windCalc.finalValue}m</td>
+                                    <td class="factor">${(((forecast.windWaveHeight || forecast.totalWaveHeight * 0.5) - windCalc.finalValue) / (forecast.windWaveHeight || forecast.totalWaveHeight * 0.5) * 100).toFixed(1)}%</td>
+                                </tr>
+                                <tr>
+                                    <td>涌浪分量</td>
+                                    <td>${forecast.swellHeight || (forecast.totalWaveHeight * 0.4).toFixed(2)}m</td>
+                                    <td>${swellCalc.finalValue}m</td>
+                                    <td class="factor">${(((forecast.swellHeight || forecast.totalWaveHeight * 0.4) - swellCalc.finalValue) / (forecast.swellHeight || forecast.totalWaveHeight * 0.4) * 100).toFixed(1)}%</td>
+                                </tr>
+                            </table>
+                        </div>
+                    `;
+                    
+                    resultCard.innerHTML = html;
+                    resultsDiv.appendChild(resultCard);
+                    
+                } else {
+                    throw new Error('未获取到有效数据');
+                }
+                
+            } catch (error) {
+                console.error('Debug error:', error);
+                
+                if (resultsDiv.contains(loadingCard)) {
+                    resultsDiv.removeChild(loadingCard);
+                }
+                
+                const errorCard = document.createElement('div');
+                errorCard.className = 'debug-card';
+                errorCard.innerHTML = `
+                    <h3>${spot.name}</h3>
+                    <div style="color: #dc3545;">错误: ${error.message}</div>
+                `;
+                resultsDiv.appendChild(errorCard);
+            }
+        }
+
+        function debugHainanSpot() {
+            debugSpot('hainan');
+        }
+
+        function debugQingdaoSpot() {
+            debugSpot('qingdao');
+        }
+
+        function debugZhoushanSpot() {
+            debugSpot('zhoushan');
+        }
+
+        function clearResults() {
+            document.getElementById('results').innerHTML = '';
+        }
+
+        // 页面加载时显示说明
+        document.addEventListener('DOMContentLoaded', function() {
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.innerHTML = `
+                <div class="debug-card">
+                    <h3>🔍 计算步骤说明</h3>
+                    <p>此工具详细展示浪高数据从API原始值到网站显示值的完整计算过程：</p>
+                    <ol>
+                        <li><strong>API原始数据</strong> - Windy API返回的未处理浪高值</li>
+                        <li><strong>地形校准</strong> - 根据海湾形状调整 (开放0.9/封闭0.4)</li>
+                        <li><strong>海床校准</strong> - 根据海床类型调整 (沙/岩石/珊瑚礁等)</li>
+                        <li><strong>能量衰减</strong> - 考虑海浪传播过程中的能量损失</li>
+                        <li><strong>最终结果</strong> - 四舍五入并设置最小值限制</li>
+                    </ol>
+                    <p>点击上方按钮查看具体浪点的详细计算过程。</p>
+                </div>
+            `;
+        });
+    </script>
+</body>
+</html>
